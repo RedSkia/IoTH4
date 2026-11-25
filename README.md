@@ -20,11 +20,18 @@ Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wils
 | `platformio.ini` | Board og bibliotek |
 | `docs/blueprint.svg` | Tegning af boardet |
 | `docs/opkobling.md` | Hvilke pins der går hvorhen |
-| `tests/hardware_test.cpp` | Test af knapper og LED'er (kopier til src/main.cpp) |
+| `docs/test.md` | Testrapport med alle scenarier |
+| `simtest/` | Simuleringstest af knaplogikken (se simtest/README.md) |
 
 ## Indstillinger (toppen af main.cpp)
 | Navn | Værdi | Betyder |
 |---|---|---|
-| `LED_MS` | 2000 | LED lyser 2 s efter tryk |
+| `LED_MS` | 2000 | LED lyser 2 s, og alle knapper er låst (anti-spam) |
 | `AWAKE_MS` | 10000 | sover efter 10 s uden tryk |
 | `SLEEP_S` | 3600 | vågner selv hver time |
+
+## Selvtest
+Ved upload, reset (EN) og når strømmen sættes til, kører `selfTest()` i `main.cpp`:
+- LED'erne lyser én ad gangen (tjek med øjnene).
+- Knapperne skal være LOW, når ingen trykker. Ellers skrives `FAIL` i Serial Monitor, og alle LED'er blinker hurtigt.
+Selvtesten kører ikke, når enheden vågner fra deep sleep.
