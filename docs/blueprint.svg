@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="840" viewBox="0 0 760 840" font-family="Arial, sans-serif">
+<rect width="760" height="840" fill="#ffffff"/>
+<text x="380" y="32" font-size="20" font-weight="bold" text-anchor="middle" fill="#222">SmileyBoard – opkobling (ESP32 DevKit V1)</text>
+<line x1="330" y1="360" x2="330" y2="740" stroke="#E24B4A" stroke-width="5" stroke-linecap="round"/>
+<line x1="370" y1="360" x2="370" y2="740" stroke="#378ADD" stroke-width="5" stroke-linecap="round"/>
+<text x="330" y="758" font-size="16" text-anchor="middle" font-weight="bold" fill="#E24B4A" dominant-baseline="central">+</text>
+<text x="370" y="758" font-size="16" text-anchor="middle" font-weight="bold" fill="#378ADD" dominant-baseline="central">−</text>
+<rect x="190" y="60" width="360" height="285" rx="10" fill="#2F3B40" stroke="#111" stroke-width="1"/>
+<text x="370" y="78" font-size="12" text-anchor="middle" font-weight="normal" fill="#ddd" dominant-baseline="central">USB</text>
+<text x="370" y="200" font-size="18" text-anchor="middle" font-weight="bold" fill="#fff" dominant-baseline="central">ESP32</text>
+<text x="198" y="90" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">3V3</text>
+<text x="198" y="107" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">GND</text>
+<text x="198" y="124" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">D15</text>
+<text x="198" y="141" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">D2</text>
+<text x="198" y="158" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">D4</text>
+<text x="198" y="175" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">RX2</text>
+<text x="198" y="192" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">TX2</text>
+<text x="198" y="209" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">D5</text>
+<text x="198" y="226" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">D18</text>
+<text x="198" y="243" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">D19</text>
+<text x="198" y="260" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">D21</text>
+<text x="198" y="277" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">RX0</text>
+<text x="198" y="294" font-size="11" text-anchor="start" font-weight="normal" fill="#bbb" dominant-baseline="central">TX0</text>
+<text x="198" y="311" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">D22</text>
+<text x="198" y="328" font-size="11" text-anchor="start" font-weight="bold" fill="#FFD966" dominant-baseline="central">D23</text>
+<text x="542" y="90" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">VIN</text>
+<text x="542" y="107" font-size="11" text-anchor="end" font-weight="bold" fill="#FFD966" dominant-baseline="central">GND</text>
+<text x="542" y="124" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D13</text>
+<text x="542" y="141" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D12</text>
+<text x="542" y="158" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D14</text>
+<text x="542" y="175" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D27</text>
+<text x="542" y="192" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D26</text>
+<text x="542" y="209" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">D25</text>
+<text x="542" y="226" font-size="11" text-anchor="end" font-weight="bold" fill="#FFD966" dominant-baseline="central">D33</text>
+<text x="542" y="243" font-size="11" text-anchor="end" font-weight="bold" fill="#FFD966" dominant-baseline="central">D32</text>
+<text x="542" y="260" font-size="11" text-anchor="end" font-weight="bold" fill="#FFD966" dominant-baseline="central">D35</text>
+<text x="542" y="277" font-size="11" text-anchor="end" font-weight="bold" fill="#FFD966" dominant-baseline="central">D34</text>
+<text x="542" y="294" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">VN</text>
+<text x="542" y="311" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">VP</text>
+<text x="542" y="328" font-size="11" text-anchor="end" font-weight="normal" fill="#bbb" dominant-baseline="central">EN</text>
+<path d="M150 50 H140 V320 H288" fill="none" stroke="#E24B4A" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M510 67 H525 V320 H332" fill="none" stroke="#222222" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M150 288 H125 V400 H160" fill="none" stroke="#378ADD" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M150 271 H110 V480 H160" fill="none" stroke="#4C9A1E" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M150 220 H95 V560 H160" fill="none" stroke="#E8A31C" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M150 203 H80 V640 H160" fill="none" stroke="#E8702A" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M510 237 H560 V385 H472" fill="none" stroke="#378ADD" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M510 220 H580 V465 H472" fill="none" stroke="#4C9A1E" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M510 203 H600 V545 H472" fill="none" stroke="#E8A31C" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<path d="M510 186 H620 V625 H472" fill="none" stroke="#E8702A" stroke-width="3" stroke-linejoin="round" transform="translate(40,40)"/>
+<text x="250" y="405" font-size="14" text-anchor="middle" font-weight="bold" fill="#222" dominant-baseline="central">LED'er</text>
+<text x="475" y="405" font-size="14" text-anchor="middle" font-weight="bold" fill="#222" dominant-baseline="central">Knapper</text>
+<rect x="200" y="429" width="50" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="225" y="440" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">220Ω</text>
+<line x1="250" y1="440" x2="269" y2="440" stroke="#888" stroke-width="2" stroke-linecap="round"/>
+<circle cx="285" cy="440" r="16" fill="#3B7DDD" stroke="#333"/>
+<line x1="301" y1="440" x2="368" y2="440" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<text x="285" y="468" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">Blå</text>
+<rect x="200" y="509" width="50" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="225" y="520" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">220Ω</text>
+<line x1="250" y1="520" x2="269" y2="520" stroke="#888" stroke-width="2" stroke-linecap="round"/>
+<circle cx="285" cy="520" r="16" fill="#3FA34D" stroke="#333"/>
+<line x1="301" y1="520" x2="368" y2="520" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<text x="285" y="548" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">Grøn</text>
+<rect x="200" y="589" width="50" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="225" y="600" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">220Ω</text>
+<line x1="250" y1="600" x2="269" y2="600" stroke="#888" stroke-width="2" stroke-linecap="round"/>
+<circle cx="285" cy="600" r="16" fill="#F2D04B" stroke="#333"/>
+<line x1="301" y1="600" x2="368" y2="600" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<text x="285" y="628" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">Gul</text>
+<rect x="200" y="669" width="50" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="225" y="680" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">220Ω</text>
+<line x1="250" y1="680" x2="269" y2="680" stroke="#888" stroke-width="2" stroke-linecap="round"/>
+<circle cx="285" cy="680" r="16" fill="#E03B3B" stroke="#333"/>
+<line x1="301" y1="680" x2="368" y2="680" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<text x="285" y="708" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">Rød</text>
+<rect x="440" y="415" width="70" height="50" rx="6" fill="#3a3a3a" stroke="#111" stroke-width="1"/>
+<circle cx="475" cy="440" r="14" fill="#6b4a3a"/>
+<line x1="440" y1="425" x2="430" y2="425" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<rect x="385" y="414" width="45" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="407" y="425" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">10k</text>
+<line x1="385" y1="425" x2="372" y2="425" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<line x1="332" y1="455" x2="440" y2="455" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/>
+<text x="525" y="460" font-size="11" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">Knap 1</text>
+<rect x="440" y="495" width="70" height="50" rx="6" fill="#3a3a3a" stroke="#111" stroke-width="1"/>
+<circle cx="475" cy="520" r="14" fill="#6b4a3a"/>
+<line x1="440" y1="505" x2="430" y2="505" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<rect x="385" y="494" width="45" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="407" y="505" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">10k</text>
+<line x1="385" y1="505" x2="372" y2="505" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<line x1="332" y1="535" x2="440" y2="535" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/>
+<text x="525" y="540" font-size="11" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">Knap 2</text>
+<rect x="440" y="575" width="70" height="50" rx="6" fill="#3a3a3a" stroke="#111" stroke-width="1"/>
+<circle cx="475" cy="600" r="14" fill="#6b4a3a"/>
+<line x1="440" y1="585" x2="430" y2="585" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<rect x="385" y="574" width="45" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="407" y="585" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">10k</text>
+<line x1="385" y1="585" x2="372" y2="585" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<line x1="332" y1="615" x2="440" y2="615" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/>
+<text x="525" y="620" font-size="11" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">Knap 3</text>
+<rect x="440" y="655" width="70" height="50" rx="6" fill="#3a3a3a" stroke="#111" stroke-width="1"/>
+<circle cx="475" cy="680" r="14" fill="#6b4a3a"/>
+<line x1="440" y1="665" x2="430" y2="665" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<rect x="385" y="654" width="45" height="22" rx="8" fill="#9CC3E6" stroke="#5F8FB8" stroke-width="1"/>
+<text x="407" y="665" font-size="11" text-anchor="middle" font-weight="normal" fill="#222" dominant-baseline="central">10k</text>
+<line x1="385" y1="665" x2="372" y2="665" stroke="#222222" stroke-width="2" stroke-linecap="round"/>
+<line x1="332" y1="695" x2="440" y2="695" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/>
+<text x="525" y="700" font-size="11" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">Knap 4</text>
+<line x1="40" y1="800" x2="70" y2="800" stroke="#E24B4A" stroke-width="4" stroke-linecap="round"/>
+<text x="76" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">3V3 / +</text>
+<line x1="140" y1="800" x2="170" y2="800" stroke="#222222" stroke-width="4" stroke-linecap="round"/>
+<text x="176" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">GND / −</text>
+<line x1="240" y1="800" x2="270" y2="800" stroke="#378ADD" stroke-width="4" stroke-linecap="round"/>
+<text x="276" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">blå</text>
+<line x1="340" y1="800" x2="370" y2="800" stroke="#4C9A1E" stroke-width="4" stroke-linecap="round"/>
+<text x="376" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">grøn</text>
+<line x1="440" y1="800" x2="470" y2="800" stroke="#E8A31C" stroke-width="4" stroke-linecap="round"/>
+<text x="476" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">gul</text>
+<line x1="540" y1="800" x2="570" y2="800" stroke="#E8702A" stroke-width="4" stroke-linecap="round"/>
+<text x="576" y="800" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">orange</text>
+<text x="40" y="828" font-size="12" text-anchor="start" font-weight="normal" fill="#222" dominant-baseline="central">Knapper: D34, D35, D32, D33 (10k pulldown, vækker fra deep sleep)   LED'er: D23, D22, D21, D19 (220Ω)</text>
+</svg>
