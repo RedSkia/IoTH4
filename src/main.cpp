@@ -13,7 +13,8 @@ const char* TIMEZONE  = "CET-1CEST,M3.5.0,M10.5.0/3";    // dansk tid, skifter s
 const int BUTTON[4] = {34, 35, 32, 33};                  // øverst → nederst
 const int LED[4]    = {23, 22, 21, 19};
 
-const unsigned long LED_MS      = 2000;                  // LED lyser, og alle knapper er låst (anti-spam)
+const unsigned long LED_MS      = 2000;                  // LED lyser efter et tryk
+const unsigned long LOCK_MS     = 500;                   // alle knapper låst efter et tryk (anti-spam)
 const unsigned long DEBOUNCE_MS = 50;                    // alle knapper skal være sluppet så længe
 const unsigned long AWAKE_MS    = 10000;                 // sov efter 10 s uden tryk
 const uint64_t      SLEEP_S     = 3600;                  // vågn selv hver time
@@ -23,6 +24,7 @@ PubSubClient     mqtt(net);
 String           topic;                                  // elever/<bruger>/smiley
 
 unsigned long lockedUntil = 0;                           // knapperne er låst indtil da
+unsigned long ledOffAt = 0;                              // LED slukkes da
 unsigned long sleepAt;                                   // hvornår den går i søvn
 unsigned long lastHeld;                                  // sidst en knap var nede
 
@@ -132,7 +134,8 @@ void publish(const char* message) {
 void onPress(int i) {
   allLeds(false);                                        // kun den trykkede LED lyser
   digitalWrite(LED[i], HIGH);
-  lockedUntil = millis() + LED_MS;
+  lockedUntil = millis() + LOCK_MS;
+  ledOffAt    = millis() + LED_MS;
   sleepAt     = millis() + AWAKE_MS;
 
   char message[40];
@@ -176,7 +179,7 @@ void loop() {
     }
   }
 
-  if (millis() >= lockedUntil) allLeds(false);           // låsen udløbet: sluk LED
+  if (millis() >= ledOffAt) allLeds(false);              // sluk LED efter LED_MS
 
   if (millis() >= sleepAt && !anyButtonDown()) goToSleep();  // sov ikke, mens en knap holdes
   delay(10);

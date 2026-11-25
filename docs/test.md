@@ -2,7 +2,7 @@
 
 Testet med simuleringen i `simtest/` (kører den rigtige `src/main.cpp` med simuleret tid).
 
-**Regel:** Et tryk sender én besked. Derefter lyser LED'en i 2 s, og alle knapper er låst. Et nyt tryk tæller først, når alle knapper har været sluppet i 50 ms, og låsen er udløbet.
+**Regel:** Et tryk sender én besked. LED'en lyser i 2 s (`LED_MS`), og alle knapper er låst i 0,5 s (`LOCK_MS`). Et nyt tryk tæller først, når alle knapper har været sluppet i 50 ms, og låsen er udløbet.
 
 | # | Scenarie | Forventet | Resultat |
 |---|---|---|---|
@@ -12,9 +12,9 @@ Testet med simuleringen i `simtest/` (kører den rigtige `src/main.cpp` med simu
 | 4 | Vækket af blå knap | 1 besked (knap 1), sover igen | OK |
 | 5 | Blå holdes nede i 15 s | 1 besked, sover først efter slip | OK |
 | 6 | Vækket af rød, blå trykkes under opstart | Kun 1 besked (knap 4) | OK |
-| 7 | Spam: blå 40 gange på 6 s | Maks 1 besked pr. 2 s | OK |
-| 8 | Blå, så rød efter 0,3 s | 1 besked (rød ignoreres) | OK |
-| 9 | Blå, så rød efter 1,5 s (LED lyser stadig) | 1 besked (rød ignoreres) | OK |
+| 7 | Spam: blå 40 gange på 6 s | Maks 1 besked pr. 0,5 s | OK |
+| 8 | Blå, så rød efter 0,3 s (låst) | 1 besked (rød ignoreres) | OK |
+| 9 | Blå, så rød efter 0,7 s (lås udløbet) | 2 beskeder | OK |
 | 10 | Blå, så rød efter 2,5 s (LED slukket) | 2 beskeder | OK |
 | 11 | Blå og rød præcis samtidig | 1 besked | OK |
 | 12 | Rød trykkes, mens blå holdes | 1 besked (rød ignoreres) | OK |
@@ -24,10 +24,10 @@ Testet med simuleringen i `simtest/` (kører den rigtige `src/main.cpp` med simu
 ## Fejl fundet med testen
 | Fejl | Årsag | Rettelse |
 |---|---|---|
-| Rød kunne sendes 1,5 s efter blå | Låsen (1 s) var kortere end LED-tiden (2 s) | Knapperne er låst, så længe LED'en lyser |
+| Rød kunne sendes, mens blå LED lyste | Lås og LED-tid var blandet sammen | Lås (`LOCK_MS`, 0,5 s) og LED-tid (`LED_MS`, 2 s) er nu adskilt og testet hver for sig |
 | Tryk lige efter timer-opvågning blev ignoreret | Låsen startede ved opvågning, ikke ved tryk | Låsen starter kun ved et tryk (`lockedUntil`) |
 
-Kontrol: Med den gamle 1 s-lås fejler test 7 og 9, så testen fanger fejlen.
+Kontrol: Uden lås (`LOCK_MS = 0`) fejler test 7 og 8, så testen fanger spam.
 
 ## Begrænsning
 Simuleringen tester logikken, ikke hardwaren. LED'er, knapper og wi-fi testes på boardet med selvtesten og Serial Monitor.

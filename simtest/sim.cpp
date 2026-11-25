@@ -7,7 +7,7 @@
 Sim sim;
 void setup();
 void loop();
-extern unsigned long lockedUntil, sleepAt, lastHeld;     // nulstilles ved hver opvågning (som på ESP32)
+extern unsigned long lockedUntil, ledOffAt, sleepAt, lastHeld;     // nulstilles ved hver opvågning (som på ESP32)
 
 // Knapper på boardet: blå=34 (1), grøn=35 (2), gul=32 (3), rød=33 (4)
 const int BLUE = 34, GREEN = 35, YELLOW = 32, RED = 33;
@@ -20,7 +20,7 @@ void run(int wakeCause, uint64_t ext1, std::vector<Press> presses, unsigned long
   sim.ext1 = ext1;
   sim.presses = presses;
   sim.limit = limit;
-  lockedUntil = sleepAt = lastHeld = 0;
+  lockedUntil = ledOffAt = sleepAt = lastHeld = 0;
   try {
     setup();
     while (true) loop();
@@ -84,13 +84,13 @@ int main() {
   std::vector<Press> spam;
   for (unsigned long t = 3000; t < 9000; t += 150) spam.push_back({BLUE, t, t + 80});
   run(TIMER, 0, spam);
-  check("Spam: blå 40 gange på 6 s", "maks 1 besked pr. 2 s", buttonMsgs() >= 2 && buttonMsgs() <= 4 && minGap() >= 2000);
+  check("Spam: blå 40 gange på 6 s", "maks 1 besked pr. 0,5 s", buttonMsgs() >= 2 && buttonMsgs() <= 13 && minGap() >= 500);
 
   run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 3300, 3400}});
-  check("Blå, så rød efter 0,3 s", "1 besked (rød ignoreres)", buttonMsgs() == 1);
+  check("Blå, så rød efter 0,3 s (låst)", "1 besked (rød ignoreres)", buttonMsgs() == 1);
 
-  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 4500, 4600}});
-  check("Blå, så rød efter 1,5 s (LED lyser stadig)", "1 besked (rød ignoreres)", buttonMsgs() == 1);
+  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 3700, 3800}});
+  check("Blå, så rød efter 0,7 s (lås udløbet)", "2 beskeder", buttonMsgs() == 2);
 
   run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 5500, 5600}});
   check("Blå, så rød efter 2,5 s (LED slukket)", "2 beskeder", buttonMsgs() == 2);
@@ -110,7 +110,7 @@ int main() {
 
   bool onlyBlue = false;
   { sim = Sim(); sim.wakeCause = TIMER; sim.presses = {{BLUE, 3000, 3100}, {RED, 6000, 6100}}; sim.limit = 6500;
-    lockedUntil = sleepAt = lastHeld = 0;
+    lockedUntil = ledOffAt = sleepAt = lastHeld = 0;
     try { setup(); while (true) loop(); } catch (...) {}
     onlyBlue = sim.led[LED_RED] == 1 && sim.led[LED_BLUE] == 0; }
   check("Kun den trykkede LED lyser", "rød tændt, blå slukket", onlyBlue);
