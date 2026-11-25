@@ -13,20 +13,19 @@ const char* TIMEZONE  = "CET-1CEST,M3.5.0,M10.5.0/3";    // dansk tid, skifter s
 const int BUTTON[4] = {34, 35, 32, 33};                  // øverst → nederst
 const int LED[4]    = {23, 22, 21, 19};
 
-const unsigned long LED_MS      = 2000;                  // LED lyser efter et tryk
-const unsigned long LOCK_MS     = 500;                   // alle knapper låst efter et tryk (anti-spam)
+const unsigned long LED_MS      = 1000;                  // LED lyser = alle knapper låst (anti-spam)
 const unsigned long DEBOUNCE_MS = 50;                    // alle knapper skal være sluppet så længe
 const unsigned long AWAKE_MS    = 10000;                 // sov efter 10 s uden tryk
 const uint64_t      SLEEP_S     = 3600;                  // vågn selv hver time
 
+// ---------- Tilstand ----------
 WiFiClientSecure net;
 PubSubClient     mqtt(net);
 String           topic;                                  // elever/<bruger>/smiley
 
-unsigned long lockedUntil = 0;                           // knapperne er låst indtil da
-unsigned long ledOffAt = 0;                              // LED slukkes da
-unsigned long sleepAt;                                   // hvornår den går i søvn
-unsigned long lastHeld;                                  // sidst en knap var nede
+unsigned long lockedUntil = 0;                           // LED lyser, og knapperne er låst indtil da
+unsigned long sleepAt     = 0;                           // hvornår den går i søvn
+unsigned long lastHeld    = 0;                           // sidst en knap var nede
 
 // ---------- Knapper og LED'er ----------
 bool anyButtonDown() {
@@ -92,6 +91,16 @@ int wakeButton() {                                       // -1 = ikke vækket af
 }
 
 // ---------- Netværk ----------
+bool connectMqtt() {
+  String clientId = String(MQTT_USER) + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  if (!mqtt.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
+    Serial.printf("MQTT error %d\n", mqtt.state());      // 4/5 = login, -2 = forbindelse
+    return false;
+  }
+  Serial.println("Connected");
+  return true;
+}
+
 void connectAll() {
   Serial.printf("WiFi: %s ...\n", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -117,25 +126,20 @@ void connectAll() {
   net.setCACert(CA_CERT);
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   topic = String("elever/") + MQTT_USER + "/smiley";
-
-  String clientId = String(MQTT_USER) + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-  if (!mqtt.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
-    Serial.printf("MQTT error %d\n", mqtt.state());      // 4/5 = login, -2 = forbindelse
-    goToSleep();
-  }
-  Serial.println("Connected");
+  if (!connectMqtt()) goToSleep();
 }
 
+// ---------- Beskeder ----------
 void publish(const char* message) {
-  mqtt.publish(topic.c_str(), message);
-  Serial.println(message);
+  if (!mqtt.connected()) connectMqtt();                  // forbind igen, hvis forbindelsen er tabt
+  if (mqtt.publish(topic.c_str(), message)) Serial.println(message);
+  else                                      Serial.printf("NOT SENT: %s\n", message);
 }
 
 void onPress(int i) {
   allLeds(false);                                        // kun den trykkede LED lyser
   digitalWrite(LED[i], HIGH);
-  lockedUntil = millis() + LOCK_MS;
-  ledOffAt    = millis() + LED_MS;
+  lockedUntil = millis() + LED_MS;
   sleepAt     = millis() + AWAKE_MS;
 
   char message[40];
@@ -169,7 +173,7 @@ void setup() {
 void loop() {
   mqtt.loop();
 
-  // Et nyt tryk tæller kun, når alle knapper har været sluppet, og låsen er udløbet.
+  // Et nyt tryk tæller kun, når LED'en er slukket, og alle knapper har været sluppet.
   bool ready = millis() >= lockedUntil && millis() - lastHeld > DEBOUNCE_MS;
   for (int i = 0; i < 4; i++) {
     if (digitalRead(BUTTON[i])) {
@@ -179,8 +183,7 @@ void loop() {
     }
   }
 
-  if (millis() >= ledOffAt) allLeds(false);              // sluk LED efter LED_MS
-
+  if (millis() >= lockedUntil) allLeds(false);           // LED slukket = klar til næste tryk
   if (millis() >= sleepAt && !anyButtonDown()) goToSleep();  // sov ikke, mens en knap holdes
   delay(10);
 }

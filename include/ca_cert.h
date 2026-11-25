@@ -1,4 +1,4 @@
-// Laererens CA-certifikat (offentligt, maa gerne committes)
+// Lærerens CA-certifikat (offentligt, må gerne committes).
 #pragma once
 const char CA_CERT[] = R"PEM(
 -----BEGIN CERTIFICATE-----

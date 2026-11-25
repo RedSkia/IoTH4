@@ -5,20 +5,19 @@ Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wils
 
 ## Kom i gang
 1. Åbn mappen i VS Code med PlatformIO.
-2. `include/secrets.h`: skriv wi-fi navn og kode (MQTT-login er udfyldt).
-3. `include/ca_cert.h`: indsæt indholdet af https://s0ren.github.io/FAG_17682_IoT_II/Features/ca.crt
-4. Upload (→) og åbn Serial Monitor (🔌).
-5. Se beskeder: http://wilsons.local:8080/elever/marcus/smiley.jsonl
+2. Kopiér `include/secrets_eksempel.h` til `include/secrets.h`, og skriv wi-fi og MQTT-login.
+3. Upload (→) og åbn Serial Monitor (🔌).
+4. Se beskeder: http://wilsons.local:8080/elever/marcus/smiley.jsonl
 
 ## Filer
 | Fil | Indhold |
 |---|---|
 | `src/main.cpp` | Programmet |
-| `include/secrets.h` | Koder – **må aldrig committes** |
+| `include/secrets.h` | Koder, **må aldrig committes** |
 | `include/secrets_eksempel.h` | Skabelon til secrets.h |
 | `include/ca_cert.h` | Lærerens CA-certifikat |
 | `platformio.ini` | Board og bibliotek |
-| `docs/blueprint.svg` | Tegning af boardet |
+| `docs/blueprint.png` / `.svg` | Tegning af boardet |
 | `docs/opkobling.md` | Hvilke pins der går hvorhen |
 | `docs/test.md` | Testrapport med alle scenarier |
 | `simtest/` | Simuleringstest af knaplogikken (se simtest/README.md) |
@@ -26,8 +25,7 @@ Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wils
 ## Indstillinger (toppen af main.cpp)
 | Navn | Værdi | Betyder |
 |---|---|---|
-| `LED_MS` | 2000 | LED lyser 2 s efter tryk |
-| `LOCK_MS` | 500 | alle knapper låst 0,5 s efter tryk (anti-spam) |
+| `LED_MS` | 1000 | LED lyser 1 s, og så længe er alle knapper låst (anti-spam) |
 | `AWAKE_MS` | 10000 | sover efter 10 s uden tryk |
 | `SLEEP_S` | 3600 | vågner selv hver time |
 
@@ -35,4 +33,5 @@ Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wils
 Ved upload, reset (EN) og når strømmen sættes til, kører `selfTest()` i `main.cpp`:
 - LED'erne lyser én ad gangen (tjek med øjnene).
 - Knapperne skal være LOW, når ingen trykker. Ellers skrives `FAIL` i Serial Monitor, og alle LED'er blinker hurtigt.
+
 Selvtesten kører ikke, når enheden vågner fra deep sleep.
