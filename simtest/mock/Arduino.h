@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <ctime>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -61,7 +62,7 @@ inline SerialT Serial;
 struct EspT { uint64_t getEfuseMac() { return 0x4cba76958b0c; } };
 inline EspT ESP;
 
-inline void configTzTime(const char*, const char*, const char* = 0, const char* = 0) {}
+inline void configTzTime(const char* tz, const char*, const char* = 0, const char* = 0) { setenv("TZ", tz, 1); tzset(); }
 inline bool getLocalTime(tm*, uint32_t) { delay(200); return true; }
 
 enum { ESP_SLEEP_WAKEUP_UNDEFINED = 0, ESP_SLEEP_WAKEUP_EXT1 = 3, ESP_SLEEP_WAKEUP_TIMER = 4, ESP_EXT1_WAKEUP_ANY_HIGH = 1 };

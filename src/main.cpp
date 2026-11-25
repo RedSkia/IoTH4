@@ -10,14 +10,15 @@ const char* MQTT_HOST = "wilsons.local";
 const int   MQTT_PORT = 8883;                            // TLS + login
 const char* TIMEZONE  = "CET-1CEST,M3.5.0,M10.5.0/3";    // dansk tid, skifter selv sommer/vinter
 
-const int BUTTON[4] = {34, 35, 32, 33};                  // øverst → nederst
-const int LED[4]    = {23, 22, 21, 19};
+const int   BUTTON[4] = {34, 35, 32, 33};                // øverst → nederst
+const int   LED[4]    = {23, 22, 21, 19};
+const char* MOOD[4]   = {"very_happy", "happy", "unhappy", "very_unhappy"};  // hvad hver knap betyder
 
-const unsigned long LED_MS      = 100;                    // LED lyser efter et tryk
+const unsigned long LED_MS         = 100;                // LED lyser efter et tryk
 const bool          LOCK_WHILE_LED = false;              // true = knapperne er låst, så længe LED'en lyser
-const unsigned long DEBOUNCE_MS = 50;                    // alle knapper skal være sluppet så længe
-const unsigned long AWAKE_MS    = 10000;                 // sov efter 10 s uden tryk
-const uint64_t      SLEEP_S     = 3600;                  // vågn selv hver time
+const unsigned long DEBOUNCE_MS    = 50;                 // alle knapper skal være sluppet så længe
+const unsigned long AWAKE_MS       = 10000;              // sov efter 10 s uden tryk
+const uint64_t      SLEEP_S        = 3600;               // vågn selv hver time
 
 // ---------- Tilstand ----------
 WiFiClientSecure net;
@@ -54,7 +55,7 @@ bool selfTest() {
   for (int n = 0; n < 20; n++) {                         // knapperne skal være LOW, når ingen trykker
     for (int i = 0; i < 4; i++) {
       if (digitalRead(BUTTON[i])) {
-        Serial.printf("FAIL: button %d (GPIO %d) is HIGH - tjek 10k og ledning\n", i + 1, BUTTON[i]);
+        Serial.printf("FAIL: button %d (GPIO %d) is HIGH - check 10k resistor and wiring\n", i + 1, BUTTON[i]);
         return false;
       }
     }
@@ -108,7 +109,7 @@ void connectAll() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   for (int i = 0; WiFi.status() != WL_CONNECTED; i++) {
     if (i > 30) {                                        // 15 s uden wifi: sov
-      Serial.println("WiFi error (forkert navn/kode?)");
+      Serial.println("WiFi error (wrong SSID/password?)");
       goToSleep();
     }
     delay(500);
@@ -120,7 +121,7 @@ void connectAll() {
   configTzTime(TIMEZONE, "pool.ntp.org", router.c_str(), "time.google.com");
   struct tm now;
   if (!getLocalTime(&now, 10000)) {
-    Serial.println("Time error (ingen NTP-server)");
+    Serial.println("Time error (no NTP server)");
     goToSleep();
   }
   Serial.println(&now, "Time OK: %Y-%m-%d %H:%M:%S");
@@ -132,7 +133,18 @@ void connectAll() {
 }
 
 // ---------- Beskeder ----------
-void publish(const char* message) {
+// Sender JSON med dansk tid, fx:
+// {"button":1,"mood":"very_happy","time":"2026-11-25 09:47:35 CET","ts":1795596455}
+void publish(const char* fields) {                       // fields = første del af JSON, fx "\"status\":\"awake\""
+  time_t now = time(nullptr);
+  struct tm local;
+  localtime_r(&now, &local);
+  char clock[32];
+  strftime(clock, sizeof(clock), "%Y-%m-%d %H:%M:%S %Z", &local);   // CET om vinteren, CEST om sommeren
+
+  char message[160];
+  snprintf(message, sizeof(message), "{%s,\"time\":\"%s\",\"ts\":%ld}", fields, clock, (long)now);
+
   if (!mqtt.connected()) connectMqtt();                  // forbind igen, hvis forbindelsen er tabt
   if (mqtt.publish(topic.c_str(), message)) Serial.println(message);
   else                                      Serial.printf("NOT SENT: %s\n", message);
@@ -145,9 +157,9 @@ void onPress(int i) {
   ledOffAt    = millis() + LED_MS;
   sleepAt     = millis() + AWAKE_MS;
 
-  char message[40];
-  snprintf(message, sizeof(message), "{\"button\":%d,\"ts\":%ld}", i + 1, (long)time(nullptr));
-  publish(message);
+  char fields[64];
+  snprintf(fields, sizeof(fields), "\"button\":%d,\"mood\":\"%s\"", i + 1, MOOD[i]);
+  publish(fields);
 }
 
 // ---------- Program ----------
@@ -167,7 +179,7 @@ void setup() {
   connectAll();
 
   if (button >= 0) onPress(button);
-  else             publish("{\"status\":\"awake\"}");
+  else             publish("\"status\":\"awake\"");
 
   sleepAt  = millis() + AWAKE_MS;
   lastHeld = millis();                                   // knappen der vækkede skal slippes først
