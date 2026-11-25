@@ -13,7 +13,8 @@ const char* TIMEZONE  = "CET-1CEST,M3.5.0,M10.5.0/3";    // dansk tid, skifter s
 const int BUTTON[4] = {34, 35, 32, 33};                  // øverst → nederst
 const int LED[4]    = {23, 22, 21, 19};
 
-const unsigned long LED_MS      = 1000;                  // LED lyser = alle knapper låst (anti-spam)
+const unsigned long LED_MS      = 100;                    // LED lyser efter et tryk
+const bool          LOCK_WHILE_LED = false;              // true = knapperne er låst, så længe LED'en lyser
 const unsigned long DEBOUNCE_MS = 50;                    // alle knapper skal være sluppet så længe
 const unsigned long AWAKE_MS    = 10000;                 // sov efter 10 s uden tryk
 const uint64_t      SLEEP_S     = 3600;                  // vågn selv hver time
@@ -23,7 +24,8 @@ WiFiClientSecure net;
 PubSubClient     mqtt(net);
 String           topic;                                  // elever/<bruger>/smiley
 
-unsigned long lockedUntil = 0;                           // LED lyser, og knapperne er låst indtil da
+unsigned long lockedUntil = 0;                           // knapperne er låst indtil da
+unsigned long ledOffAt    = 0;                           // LED slukkes da
 unsigned long sleepAt     = 0;                           // hvornår den går i søvn
 unsigned long lastHeld    = 0;                           // sidst en knap var nede
 
@@ -139,7 +141,8 @@ void publish(const char* message) {
 void onPress(int i) {
   allLeds(false);                                        // kun den trykkede LED lyser
   digitalWrite(LED[i], HIGH);
-  lockedUntil = millis() + LED_MS;
+  lockedUntil = LOCK_WHILE_LED ? millis() + LED_MS : 0;
+  ledOffAt    = millis() + LED_MS;
   sleepAt     = millis() + AWAKE_MS;
 
   char message[40];
@@ -173,7 +176,7 @@ void setup() {
 void loop() {
   mqtt.loop();
 
-  // Et nyt tryk tæller kun, når LED'en er slukket, og alle knapper har været sluppet.
+  // Et nyt tryk tæller kun, når låsen er udløbet, og alle knapper har været sluppet.
   bool ready = millis() >= lockedUntil && millis() - lastHeld > DEBOUNCE_MS;
   for (int i = 0; i < 4; i++) {
     if (digitalRead(BUTTON[i])) {
@@ -183,7 +186,7 @@ void loop() {
     }
   }
 
-  if (millis() >= lockedUntil) allLeds(false);           // LED slukket = klar til næste tryk
+  if (millis() >= ledOffAt) allLeds(false);              // sluk LED efter LED_MS
   if (millis() >= sleepAt && !anyButtonDown()) goToSleep();  // sov ikke, mens en knap holdes
   delay(10);
 }

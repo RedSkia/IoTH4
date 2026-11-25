@@ -25,7 +25,8 @@ Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wils
 ## Indstillinger (toppen af main.cpp)
 | Navn | Værdi | Betyder |
 |---|---|---|
-| `LED_MS` | 1000 | LED lyser 1 s, og så længe er alle knapper låst (anti-spam) |
+| `LED_MS` | 1000 | LED lyser 1 s efter tryk |
+| `LOCK_WHILE_LED` | false | `true` = knapperne er låst, så længe LED'en lyser. `false` = spam tilladt |
 | `AWAKE_MS` | 10000 | sover efter 10 s uden tryk |
 | `SLEEP_S` | 3600 | vågner selv hver time |
 

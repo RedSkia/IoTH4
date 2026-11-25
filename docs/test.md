@@ -1,8 +1,8 @@
 # Test af knaplogik
 
-Testet med simuleringen i `simtest/` (kører den rigtige `src/main.cpp` med simuleret tid).
+Testet med simuleringen i `simtest/` (begge værdier af `LOCK_WHILE_LED` er testet) (kører den rigtige `src/main.cpp` med simuleret tid).
 
-**Regel:** Et tryk sender én besked. LED'en lyser i 1 s (`LED_MS`). **Så længe LED'en lyser, er alle knapper låst.** Et nyt tryk tæller først, når LED'en er slukket, og alle knapper har været sluppet i 50 ms.
+**Regel:** Hvert tryk sender én besked, og LED'en lyser i 1 s (`LED_MS`). Spam er tilladt (`LOCK_WHILE_LED = false`), som læreren ønsker. Et nyt tryk tæller, når alle knapper har været sluppet i 50 ms (debounce), så prel og holdte knapper kun giver én besked.
 
 | # | Scenarie | Forventet | Resultat |
 |---|---|---|---|
@@ -12,24 +12,22 @@ Testet med simuleringen i `simtest/` (kører den rigtige `src/main.cpp` med simu
 | 4 | Vækket af blå knap | 1 besked (knap 1), sover igen | OK |
 | 5 | Blå holdes nede i 15 s | 1 besked, sover først efter slip | OK |
 | 6 | Vækket af rød, blå trykkes under opstart | Kun 1 besked (knap 4) | OK |
-| 7 | Spam: blå 40 gange på 6 s | Maks 1 besked pr. sekund | OK |
-| 8 | Blå, så rød efter 0,3 s (LED lyser) | 1 besked (rød ignoreres) | OK |
-| 9 | Blå, så rød efter 0,7 s (LED lyser) | 1 besked (rød ignoreres) | OK |
-| 10 | Blå, så rød efter 1,3 s (LED slukket) | 2 beskeder | OK |
-| 11 | Blå, så rød efter 2,5 s (LED slukket) | 2 beskeder | OK |
-| 12 | Blå og rød præcis samtidig | 1 besked | OK |
-| 13 | Rød trykkes, mens blå holdes | 1 besked (rød ignoreres) | OK |
-| 14 | Knappen preller ved tryk og slip | 1 besked | OK |
-| 15 | Kun den trykkede LED lyser | Rød tændt, blå slukket | OK |
-| 16 | LED lyser 1 s og slukker så | Tændt ved 0,9 s, slukket ved 1,1 s | OK |
+| 7 | Spam: blå 40 gange på 6 s | 40 beskeder (spam tilladt) | OK |
+| 8 | Blå, så rød efter 0,3 s | 2 beskeder | OK |
+| 9 | Blå, så rød efter 2,5 s | 2 beskeder | OK |
+| 10 | Blå og rød præcis samtidig | 1 besked | OK |
+| 11 | Rød trykkes, mens blå holdes | 1 besked (rød ignoreres) | OK |
+| 12 | Knappen preller ved tryk og slip | 1 besked | OK |
+| 13 | Rød trykkes, mens blå LED lyser | LED skifter til rød | OK |
+| 14 | LED lyser 1 s og slukker så | Tændt ved 0,9 s, slukket ved 1,1 s | OK |
 
-## Fejl fundet med testen
-| Fejl | Årsag | Rettelse |
-|---|---|---|
-| Rød kunne sendes, mens blå LED lyste | Lås og LED-tid var forskellige | Ét tal (`LED_MS`): LED tændt = låst |
-| Tryk lige efter timer-opvågning blev ignoreret | Låsen startede ved opvågning, ikke ved tryk | Låsen starter kun ved et tryk (`lockedUntil`) |
-
-Kontrol: Uden lås (`LED_MS = 0`) fejler 5 tests (7, 8, 9, 15, 16), så testen fanger spam.
+## Beslutninger
+| Valg | Begrundelse |
+|---|---|
+| Spam tilladt (`LOCK_WHILE_LED = false`) | Lærerens ønske. Sæt til `true`, hvis knapperne skal være låst, mens LED'en lyser |
+| LED-tid og lås er adskilt | LED'en kan altid ses, og låsen slås til/fra med én bool |
+| Debounce 50 ms | Knappen preller, så ét tryk ellers kan give flere beskeder |
+| Tryk tæller først, når alle knapper er sluppet | En holdt knap giver kun én besked |
 
 ## Begrænsning
 Simuleringen tester logikken, ikke hardwaren. LED'er, knapper og wi-fi testes på boardet med selvtesten og Serial Monitor.

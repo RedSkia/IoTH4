@@ -1,12 +1,9 @@
 // Simuleringstest af src/main.cpp på computeren (ingen ESP32 nødvendig).
 // Kør fra projektmappen:
-//   g++ -std=c++17 -I simtest/mock simtest/sim.cpp src/main.cpp -o sim && ./sim
+//   g++ -std=c++17 -I simtest/mock simtest/sim.cpp -o sim && ./sim
 #include "mock/Arduino.h"
-
 Sim sim;
-void setup();
-void loop();
-extern unsigned long lockedUntil, sleepAt, lastHeld;     // nulstilles ved hver opvågning (som på ESP32)
+#include "../src/main.cpp"                               // det rigtige program
 
 // Knapper og LED'er på boardet
 const int BLUE = 34, GREEN = 35, YELLOW = 32, RED = 33;
@@ -23,7 +20,7 @@ void run(int wakeCause, uint64_t ext1, std::vector<Press> presses, unsigned long
   sim.ext1 = ext1;
   sim.presses = presses;
   sim.limit = limit;
-  lockedUntil = sleepAt = lastHeld = 0;
+  lockedUntil = ledOffAt = sleepAt = lastHeld = 0;    // nulstilles ved hver opvågning (som på ESP32)
   try {
     setup();
     while (true) loop();
@@ -48,18 +45,6 @@ bool hasLog(const std::string& text) {
   return false;
 }
 
-unsigned long minGap() {                                 // mindste tid mellem to knap-beskeder
-  unsigned long gap = 999999, last = 0;
-  bool first = true;
-  for (auto& m : sim.sent) {
-    if (m.second.find("button") == std::string::npos) continue;
-    if (!first) gap = std::min(gap, m.first - last);
-    last = m.first;
-    first = false;
-  }
-  return gap;
-}
-
 int fails = 0;
 void check(const char* name, const char* expect, bool ok) {
   printf("| %-44s | %-40s | %-4s |\n", name, expect, ok ? "OK" : "FEJL");
@@ -68,6 +53,7 @@ void check(const char* name, const char* expect, bool ok) {
 
 // ---------- Tests ----------
 int main() {
+  printf("LOCK_WHILE_LED = %s\n\n", LOCK_WHILE_LED ? "true" : "false");
   printf("| %-44s | %-40s | %-4s |\n", "Test", "Forventet", "");
   printf("|%s|%s|%s|\n", std::string(46, '-').c_str(), std::string(42, '-').c_str(), std::string(6, '-').c_str());
 
@@ -101,20 +87,15 @@ int main() {
   std::vector<Press> spam;
   for (unsigned long t = 3000; t < 9000; t += 150) spam.push_back({BLUE, t, t + 80});
   run(TIMER, 0, spam);
-  check("Spam: blå 40 gange på 6 s", "maks 1 besked pr. sekund",
-        buttonMsgs() >= 2 && buttonMsgs() <= 7 && minGap() >= 1000);
+  if (LOCK_WHILE_LED) check("Spam: blå 40 gange på 6 s", "maks 1 besked pr. LED-tid", buttonMsgs() >= 2 && buttonMsgs() <= 7);
+  else                check("Spam: blå 40 gange på 6 s", "40 beskeder (spam tilladt)", buttonMsgs() == 40);
 
   run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 3300, 3400}});
-  check("Blå, så rød efter 0,3 s (LED lyser = låst)", "1 besked (rød ignoreres)", buttonMsgs() == 1);
-
-  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 3700, 3800}});
-  check("Blå, så rød efter 0,7 s (LED lyser = låst)", "1 besked (rød ignoreres)", buttonMsgs() == 1);
-
-  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 4300, 4400}});
-  check("Blå, så rød efter 1,3 s (LED slukket)", "2 beskeder", buttonMsgs() == 2);
+  if (LOCK_WHILE_LED) check("Blå, så rød efter 0,3 s", "1 besked (låst)", buttonMsgs() == 1);
+  else                check("Blå, så rød efter 0,3 s", "2 beskeder", buttonMsgs() == 2);
 
   run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 5500, 5600}});
-  check("Blå, så rød efter 2,5 s (LED slukket)", "2 beskeder", buttonMsgs() == 2);
+  check("Blå, så rød efter 2,5 s", "2 beskeder", buttonMsgs() == 2);
 
   run(TIMER, 0, {{BLUE, 3000, 3200}, {RED, 3000, 3200}});
   check("Blå og rød præcis samtidig", "1 besked", buttonMsgs() == 1);
@@ -130,9 +111,11 @@ int main() {
   check("Knappen preller ved tryk og slip", "1 besked", buttonMsgs() == 1);
 
   // LED'er
-  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 6000, 6100}}, 6500);
-  check("Kun den trykkede LED lyser", "rød tændt, blå slukket",
-        sim.led[LED_RED] == 1 && sim.led[LED_BLUE] == 0);
+  run(TIMER, 0, {{BLUE, 3000, 3100}, {RED, 3300, 3400}}, 3500);
+  if (LOCK_WHILE_LED) check("Rød trykkes mens blå LED lyser", "blå bliver, rød ignoreres",
+                            sim.led[LED_BLUE] == 1 && sim.led[LED_RED] == 0);
+  else                check("Rød trykkes mens blå LED lyser", "LED skifter: rød tændt, blå slukket",
+                            sim.led[LED_RED] == 1 && sim.led[LED_BLUE] == 0);
 
   run(TIMER, 0, {{BLUE, 3000, 3100}}, 3900);
   bool onAt900 = sim.led[LED_BLUE] == 1;
