@@ -1,0 +1,5 @@
+.pio
+.vscode
+include/secrets.h
+hosttest/run
+hosttest/run.exe
