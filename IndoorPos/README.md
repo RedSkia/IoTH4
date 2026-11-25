@@ -69,6 +69,15 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 | `MIN_ANCHORS` | 3 | Ankre der skal til for en position |
 | `PUBLISH_RAW` | false | Send rå RSSI (kun til kalibrering) |
 
+## Fejlfinding
+| Problem | Løsning |
+|---|---|
+| Ingen positioner | Mobilen sender næsten intet, når skærmen er slukket. Hold skærmen tændt og afspil fx en video under test |
+| Ankrene sender, men gatewayen modtager intet | Forkert MAC i `config.h`, forskellige nøgler i `secrets.h`, eller routeren har skiftet kanal. Genstart ankrene, så finder de kanalen igen |
+| Anker blinker hurtigt hele tiden | Den kan ikke finde `WIFI_SSID`. Tjek navnet i `secrets.h` |
+| `MQTT error 4/5` | Forkert MQTT-login |
+| Positionen hopper meget | Normalt for RSSI. Kalibrér igen, og hold ankrene i samme højde med fri antenne |
+
 ## Udskiftning og udbygning
 - **Andet signal end wi-fi** (fx BLE): skift kun snifferen i `src/anchor/`. Beskeden og gatewayen er uændrede.
 - **Anden beregning** (fx vægtet centroid eller Kalman-filter): skift `lib/positioning/`. Testene viser, om den stadig virker.

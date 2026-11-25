@@ -89,6 +89,7 @@ void onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
   if (type == WIFI_PKT_DATA && fromAp) return;
 
   const uint8_t* mac = frame + 10;                   // addr2 = afsenderen
+  if (sameMac(mac, frame + 16)) return;              // afsender = BSSID (addr3): en router, ikke en mobil
   if (isOwnSetup(mac)) return;
 
   portENTER_CRITICAL(&seenLock);

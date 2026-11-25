@@ -158,7 +158,8 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) delay(250);
   Serial.printf("WiFi OK, channel %d\n", WiFi.channel());
 
-  configTzTime(TIMEZONE, "pool.ntp.org", WiFi.gatewayIP().toString().c_str());
+  static String router = WiFi.gatewayIP().toString();   // static: NTP gemmer kun en pointer til navnet
+  configTzTime(TIMEZONE, "pool.ntp.org", router.c_str());
   struct tm now;
   if (getLocalTime(&now, 10000)) Serial.println(&now, "Time OK: %Y-%m-%d %H:%M:%S");
   else                           Serial.println("Time error (no NTP server)");
