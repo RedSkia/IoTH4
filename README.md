@@ -1,7 +1,7 @@
 # SmileyBoard
 
 Smiley feedback panel (ESP32) – IoT II, TEC.
-Knaptryk sendes som `{"knap":N,"ts":...}` til `elever/marcus/smiley` på `wilsons.local:8883` (TLS + login). Enheden sover mellem tryk (deep sleep).
+Knaptryk sendes som `{"button":N,"ts":...}` til `elever/marcus/smiley` på `wilsons.local:8883` (TLS + login). Enheden sover mellem tryk (deep sleep).
 
 ## Kom i gang
 1. Åbn mappen i VS Code med PlatformIO.
@@ -20,11 +20,11 @@ Knaptryk sendes som `{"knap":N,"ts":...}` til `elever/marcus/smiley` på `wilson
 | `platformio.ini` | Board og bibliotek |
 | `docs/blueprint.svg` | Tegning af boardet |
 | `docs/opkobling.md` | Hvilke pins der går hvorhen |
-| `ekstra/hardware_test.cpp` | Test af knapper og LED'er (kopier til src/main.cpp) |
+| `tests/hardware_test.cpp` | Test af knapper og LED'er (kopier til src/main.cpp) |
 
 ## Indstillinger (toppen af main.cpp)
 | Navn | Værdi | Betyder |
 |---|---|---|
 | `LED_MS` | 2000 | LED lyser 2 s efter tryk |
-| `VAAGEN_MS` | 10000 | sover efter 10 s uden tryk |
-| `SOVE_S` | 3600 | vågner selv hver time |
+| `AWAKE_MS` | 10000 | sover efter 10 s uden tryk |
+| `SLEEP_S` | 3600 | vågner selv hver time |
