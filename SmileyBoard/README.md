@@ -51,5 +51,6 @@ Ved timer-opvågning sendes `{"status":"awake","time":"...","ts":...}`.
 Ved upload, reset (EN) og når strømmen sættes til, kører `selfTest()` i `main.cpp`:
 - LED'erne lyser én ad gangen (tjek med øjnene).
 - Knapperne skal være LOW, når ingen trykker. Ellers skrives `FAIL` i Serial Monitor, og alle LED'er blinker hurtigt.
+- Er testen OK, lyser alle LED'er én gang i 0,5 s. Så er den klar.
 
 Selvtesten kører ikke, når enheden vågner fra deep sleep.

@@ -62,6 +62,10 @@ bool selfTest() {
     delay(5);
   }
 
+  allLeds(true);                                         // alle LED'er lyser én gang = klar
+  delay(500);
+  allLeds(false);
+
   Serial.println("Self test OK");
   return true;
 }
