@@ -31,7 +31,7 @@ Fire ESP32-ankre i hjørnerne måler signalstyrken (RSSI) fra mobilers wi-fi. En
 2. Upload `env:gateway` til ét board og `env:anchor1` … `env:anchor4` til de andre. Miljøet vælges nederst i VS Code.
 3. Åbn Serial Monitor på hvert board, og skriv `My MAC:` ind i `include/config.h` (`GATEWAY_MAC` og `ANCHOR_MAC`).
 4. Upload alle fem igen.
-5. Mål området, og skriv bredde og højde i `AREA_WIDTH` og `AREA_HEIGHT`. Sæt A1 i (0, 0), A2 i (B, 0), A3 i (B, H) og A4 i (0, H), alle i samme højde.
+5. Mål området, og skriv bredde og højde i `AREA_WIDTH` og `AREA_HEIGHT`. Sæt A1 i (0, 0) top venstre, A2 i (B, 0) top højre, A3 i (0, H) bund venstre og A4 i (B, H) bund højre, alle i samme højde.
 6. Forbind testmobilen til `IoT_H3/4`. Ankrene lytter kun på routerens kanal.
 
 ## Kalibrering

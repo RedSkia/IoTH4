@@ -11,11 +11,14 @@ const float AREA_HEIGHT = 2.0f;                      // H
 
 // ---------- Ankrene ----------
 const int ANCHOR_COUNT = 4;
-const Point ANCHOR_POS[ANCHOR_COUNT] = {             // A1..A4 i hjørnerne
-  {0.0f,       0.0f},
-  {AREA_WIDTH, 0.0f},
-  {AREA_WIDTH, AREA_HEIGHT},
-  {0.0f,       AREA_HEIGHT},
+// Set oppefra:   A1 ── A2     (0,0) er A1. x går mod højre, y går nedad.
+//                │      │
+//                A3 ── A4
+const Point ANCHOR_POS[ANCHOR_COUNT] = {
+  {0.0f,       0.0f},                                // A1 top venstre
+  {AREA_WIDTH, 0.0f},                                // A2 top højre
+  {0.0f,       AREA_HEIGHT},                         // A3 bund venstre
+  {AREA_WIDTH, AREA_HEIGHT},                         // A4 bund højre
 };
 
 // MAC-adresser: hvert board skriver sin egen MAC i Serial Monitor ved opstart.
@@ -42,7 +45,7 @@ const int           MIN_SAMPLES = 2;                 // mindst 2 pakker i et vin
 // ---------- MQTT ----------
 const char* const MQTT_HOST   = "wilsons.local";
 const int         MQTT_PORT   = 8883;                // TLS + login
-const bool        PUBLISH_RAW = false;               // true = send også rå RSSI (til kalibrering)
+const bool        PUBLISH_RAW = true;               // true = send også rå RSSI (til kalibrering)
 
 // ---------- Tid ----------
 const char* const TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3";   // dansk tid
