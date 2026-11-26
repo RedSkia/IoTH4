@@ -59,7 +59,7 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 ## Indstillinger (`include/config.h`)
 | Navn | Standard | Betyder |
 |---|---|---|
-| `AREA_WIDTH`, `AREA_HEIGHT` | 4, 3 | Områdets størrelse i meter |
+| `AREA_WIDTH`, `AREA_HEIGHT` | 2, 2 | Områdets størrelse i meter |
 | `RSSI_AT_1M` | −45 | Kalibreres |
 | `PATH_LOSS_EXPONENT` | 2.5 | Kalibreres |
 | `RSSI_MIN` | −90 | Svagere pakker ignoreres |

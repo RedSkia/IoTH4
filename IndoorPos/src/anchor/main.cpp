@@ -7,6 +7,8 @@
 #include <esp_wifi.h>
 #include <ESP32_NOW.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/platform_util.h>
+#include <math.h>
 #include "config.h"
 #include "protocol.h"
 #include "secrets.h"
@@ -40,15 +42,22 @@ public:
     return ok;
   }
   void onSent(bool success) override {
-    if (!success) failed++;
+    if (success) delivered = delivered + 1;
+    else         failed    = failed + 1;
     waitingForAck = false;
   }
   volatile bool     waitingForAck = false;
+  volatile uint32_t delivered     = 0;               // kvitteret af gatewayen
   volatile uint32_t failed        = 0;
 };
 
 GatewayPeer gateway;
 uint32_t    seq = 0;
+int         badWindows = 0;                          // vinduer i træk, hvor intet nåede frem
+
+// Når intet når frem i 30 s, genstarter ankeret og finder routerens kanal igen
+// (routeren kan have skiftet kanal, og gatewayen er fulgt med).
+const int MAX_BAD_WINDOWS = 15;                      // 15 × 2 s = 30 s
 
 // ---------- Hjælpefunktioner ----------
 bool sameMac(const uint8_t* a, const uint8_t* b) { return memcmp(a, b, 6) == 0; }
@@ -165,10 +174,12 @@ void loop() {
   portENTER_CRITICAL(&seenLock);
   int n = seenCount;
   memcpy(batch, seen, n * sizeof(Seen));
+  memset(seen, 0, n * sizeof(Seen));                 // rå MAC'er slettes med det samme
   seenCount = 0;
   portEXIT_CRITICAL(&seenLock);
 
-  int sent = 0;
+  uint32_t deliveredBefore = gateway.delivered;
+  int tried = 0;
   for (int i = 0; i < n; i++) {
     if (batch[i].count < MIN_SAMPLES) continue;
 
@@ -177,18 +188,27 @@ void loop() {
     m.anchorId = ANCHOR_ID;
     m.seq      = seq++;
     hashMac(batch[i].mac, m.deviceId);
-    m.rssi     = batch[i].rssiSum / batch[i].count;
+    m.rssi     = (int8_t)lroundf((float)batch[i].rssiSum / batch[i].count);
     m.samples  = batch[i].count > 255 ? 255 : batch[i].count;
 
     digitalWrite(LED_PIN, HIGH);                     // kort blink = sender
     if (gateway.sendMeasurement(m)) {
       unsigned long start = millis();                // vent på kvittering før næste
       while (gateway.waitingForAck && millis() - start < 100) delay(1);
-      sent++;
     }
+    tried++;
     digitalWrite(LED_PIN, LOW);
   }
 
-  memset(batch, 0, sizeof(batch));                   // rå MAC'er slettes efter brug
-  Serial.printf("Window: %d devices, %d sent, %lu failed\n", n, sent, (unsigned long)gateway.failed);
+  mbedtls_platform_zeroize(batch, sizeof(batch));    // rå MAC'er slettes (compileren kan ikke fjerne det)
+  int delivered = gateway.delivered - deliveredBefore;
+  Serial.printf("Window: %d devices, %d delivered of %d, %lu failed total\n",
+                n, delivered, tried, (unsigned long)gateway.failed);
+
+  if (tried > 0 && delivered == 0) badWindows++;
+  else if (delivered > 0)          badWindows = 0;
+  if (badWindows >= MAX_BAD_WINDOWS) {
+    Serial.println("Gateway not answering - restarting to find the router channel again");
+    ESP.restart();
+  }
 }

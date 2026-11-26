@@ -31,6 +31,10 @@ public:
     r.anchorIndex = index;
     memcpy(&r.m, data, sizeof(Measurement));
     if (r.m.version != PROTOCOL_VERSION) return;
+    if (r.m.anchorId != index + 1) {                 // board uploadet med forkert anchor-miljø
+      Serial.printf("Anchor mismatch: MAC of A%d sends as A%d - check ANCHOR_MAC/upload\n", index + 1, r.m.anchorId);
+      return;
+    }
     xQueueSend(inbox, &r, 0);                        // fuld kø: målingen droppes
   }
 private:
@@ -135,6 +139,10 @@ void computePositions() {
     p = clampToArea(p, AREA_WIDTH, AREA_HEIGHT);
 
     time_t ts = time(nullptr);
+    if (ts < 1700000000) {                           // tiden er ikke hentet (NTP) endnu: ingen 1970-data
+      Serial.println("No valid time yet - position not published");
+      return;
+    }
     char clock[32];
     timeText(clock, sizeof(clock), ts);
     char json[160];
@@ -152,11 +160,12 @@ void setup() {
   inbox = xQueueCreate(64, sizeof(Received));
 
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);                              // radioen skal altid lytte, ellers tabes ESP-NOW-beskeder
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.printf("\nGateway\nMy MAC: %s\n", WiFi.macAddress().c_str());   // skriv den ind i config.h (GATEWAY_MAC)
   while (WiFi.status() != WL_CONNECTED) delay(250);
-  Serial.printf("WiFi OK, channel %d\n", WiFi.channel());
+  Serial.printf("WiFi OK, channel %d\n", (int)WiFi.channel());
 
   static String router = WiFi.gatewayIP().toString();   // static: NTP gemmer kun en pointer til navnet
   configTzTime(TIMEZONE, "pool.ntp.org", router.c_str());

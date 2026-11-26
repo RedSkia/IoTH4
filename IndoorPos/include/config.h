@@ -6,8 +6,8 @@
 // Koder (wi-fi, MQTT, nøgler) ligger i secrets.h, som ikke er i git.
 
 // ---------- Området (meter) ----------
-const float AREA_WIDTH  = 4.0f;                      // B: mål jeres bord/lokale
-const float AREA_HEIGHT = 3.0f;                      // H
+const float AREA_WIDTH  = 2.0f;                      // B: mål jeres bord/lokale
+const float AREA_HEIGHT = 2.0f;                      // H
 
 // ---------- Ankrene ----------
 const int ANCHOR_COUNT = 4;
