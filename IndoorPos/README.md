@@ -1,44 +1,65 @@
 # IndoorPos
 
 Positionsbestemmelse af mobiler uden GPS – IoT II, TEC.
-Fire ESP32-ankre i hjørnerne måler signalstyrken (RSSI) fra mobilers wi-fi. En gateway-ESP32 regner positionen ud og sender **id, tid og (x, y)** til MQTT.
+ESP32-ankre måler signalstyrken (RSSI) fra mobilers wi-fi. En gateway-ESP32 regner positionen ud og sender **id, tid og (x, y)** til MQTT.
+Virker med **2 ankre** (position på en linje) og **3 eller flere** (position i planet): trekant, firkant, femkant, sekskant osv.
 
 ![Opstilling](docs/setup.png)
 
 ## Arkitektur
 | Del | Program | Opgave |
 |---|---|---|
-| A1–A4 (ankre) | `src/anchor/` | Sniffer wi-fi-pakker, beregner gennemsnitlig RSSI pr. enhed, sender til gateway med krypteret ESP-NOW |
-| Gateway | `src/gateway/` | Modtager RSSI, beregner (x, y) med trilateration, sender til MQTT med TLS |
-| Matematik | `lib/positioning/` | RSSI → afstand og trilateration. Uden Arduino, så den kan testes og genbruges |
-| Beskedformat | `include/protocol.h` | Den 16-byte struct, ankrene sender |
+| Start | `src/main.cpp` | Samme program på alle boards. Vælger rollen ud fra det, der er skrevet i Serial Monitor |
+| Ankre | `src/anchor/` | Sniffer wi-fi-pakker, beregner gennemsnitlig RSSI pr. enhed, sender til gatewayen med ESP-NOW |
+| Gateway | `src/gateway/` | Finder ankrene, modtager RSSI, beregner (x, y), sender til MQTT med TLS |
+| Matematik | `lib/positioning/` | RSSI → afstand, trilateration og position på en linje. Uden Arduino, så den kan testes og genbruges |
+| Beskeder | `include/protocol.h` | Hello fra gateway, hello fra anker, måling |
 
-**Dataflow:** mobil → (wi-fi-pakke) → anker → (ESP-NOW, krypteret) → gateway → (MQTT, TLS) → wilsons.local → database.
+**Dataflow:** mobil → (wi-fi-pakke) → anker → (ESP-NOW) → gateway → (MQTT, TLS) → wilsons.local → database.
+
+**Automatisk forbindelse:** Gatewayen siger "her er jeg" to gange i sekundet. Et anker prøver kanal 1-13, til det hører sin gateway, og svarer med sit nummer og sin position. Derfor skal hverken MAC-adresser eller kanal skrives ind nogen steder. Hver gruppe får sit eget nummer ud fra `MQTT_USER`, så flere hold kan køre samme program i samme lokale uden at blande boards.
+
+**Hvilke enheder spores:** kun enheder, der er forbundet til wi-fi og sender data til routeren (fx en mobil på `IoT_H3/4`). Mobiler, der kun leder efter netværk, bruger en tilfældig MAC, som skifter hele tiden, og ville give falske enheder.
 
 ## Hardware
-- 5 × ESP32 DevKit V1 (4 ankre + 1 gateway). Minimum 3 ankre.
+- 1 ESP32 DevKit V1 som gateway og 2 eller flere som ankre.
 - USB-strøm til hver (powerbank eller lader). **Ingen ledninger eller breadboard.**
 - Den indbyggede blå LED (GPIO 2) viser status.
 
 | LED | Anker | Gateway |
 |---|---|---|
+| Langsomt blink | Venter på en rolle | Venter på en rolle |
+| Dobbeltblink | Leder efter gatewayen | – |
 | Kort blink | Sender måling | – |
-| Hurtigt blink | Finder ikke routeren | – |
 | Tændt | – | Forbundet til MQTT |
 
 ## Opsætning
-1. Kopiér `include/secrets_example.h` til `include/secrets.h`. Udfyld wi-fi, MQTT-login, to ESP-NOW-nøgler (16 tegn hver) og et hemmeligt salt. Brug de samme værdier på alle boards.
-2. Upload `env:gateway` til ét board og `env:anchor1` … `env:anchor4` til de andre. Miljøet vælges nederst i VS Code.
-3. Åbn Serial Monitor på hvert board, og skriv `My MAC:` ind i `include/config.h` (`GATEWAY_MAC` og `ANCHOR_MAC`).
-4. Upload alle fem igen.
-5. Mål området, og skriv bredde og højde i `AREA_WIDTH` og `AREA_HEIGHT`. Sæt A1 i (0, 0) top venstre, A2 i (B, 0) top højre, A3 i (0, H) bund venstre og A4 i (B, H) bund højre, alle i samme højde.
-6. Forbind testmobilen til `IoT_H3/4`. Ankrene lytter kun på routerens kanal.
+1. Kopiér `include/secrets_example.h` til `include/secrets.h`, og udfyld den.
+2. Skriv i `include/config.h`, hvor mange ankre I bruger (`ANCHORS`), og hvor mange meter der er mellem dem (`SPACING_M`).
+3. Upload til alle boards (samme program).
+4. Sæt hvert board til computeren, åbn Serial Monitor, skriv, og tryk Enter:
+   - `g` på ét board → gateway
+   - `1`, `2`, `3` … på de andre → ankrenes numre
+5. Stil ankrene op som vist nedenfor, og tænd alle boards. Færdig.
+
+**Sådan stilles ankrene:** altid **med uret** rundt, set oppefra. A1 øverst til venstre, A2 til højre for den, og så videre rundt. `SPACING_M` er afstanden mellem to naboer.
+```
+2 ankre:  A1 ── A2
+
+3 ankre:  A1 ── A2        4 ankre:  A1 ── A2        5, 6, 7 … ankre:
+            \  /                    │      │        samme idé, femkant,
+             A3                     A4 ── A3        sekskant osv.
+```
+- Gatewayen skriver `Anchor A1 at (0.00, 0.00) joined` for hvert anker.
+- Testmobilen skal være forbundet til `IoT_H3/4`.
+- **Skæv opstilling?** Skriv nummer og position selv, fx `3 1.5 2` (x og y i meter).
+- **Skift rolle:** skriv en ny kommando, eller `reset` for at starte forfra.
 
 ## Kalibrering
 Afstanden beregnes med `d = 10^((RSSI_AT_1M − RSSI) / (10 · n))`.
 1. Sæt `PUBLISH_RAW = true`, og upload gatewayen. Rå målinger kommer nu på `elever/<bruger>/rssi`.
-2. Hold mobilen 1 m fra A1. Gennemsnittet af RSSI er `RSSI_AT_1M`.
-3. Gentag ved 2, 3 og 4 m. Regn `n = (RSSI_AT_1M − RSSI) / (10 · log10(d))` ud og tag gennemsnittet. Det er `PATH_LOSS_EXPONENT`.
+2. Hold mobilen 1 m fra et anker. Gennemsnittet af RSSI er `RSSI_AT_1M`.
+3. Gentag ved 2, 3 og 4 m. Regn `n = (RSSI_AT_1M − RSSI) / (10 · log10(d))` ud, og tag gennemsnittet. Det er `PATH_LOSS_EXPONENT`.
 4. Skriv tallene i `config.h`, og sæt `PUBLISH_RAW = false`.
 
 ## Data (MQTT)
@@ -50,43 +71,49 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 |---|---|
 | `id` | Anonymt id: hash af MAC-adressen med hemmeligt salt |
 | `time` | Dansk tid, til mennesker |
-| `ts` | Unix-tid, til beregninger (fx tryk pr. time) |
-| `x`, `y` | Position i meter fra A1 |
-| `anchors` | Antal ankre bag beregningen (3 eller 4) |
+| `ts` | Unix-tid, til beregninger (fx antal pr. time) |
+| `x`, `y` | Position i meter, i samme koordinater som ankrenes positioner |
+| `anchors` | Antal ankre bag beregningen |
 
 **Krav til datalagringen:** en MQTT-broker med TLS på port 8883, et login med skriveret til `elever/<bruger>/#` og en subscriber, der gemmer hver JSON-linje (fx lærerens Mosquitto + MongoDB). Felterne er flade, så der kan grupperes direkte på `ts` (pr. time) og `x`/`y` (heatmap).
 
 ## Indstillinger (`include/config.h`)
 | Navn | Standard | Betyder |
 |---|---|---|
-| `AREA_WIDTH`, `AREA_HEIGHT` | 2, 2 | Områdets størrelse i meter |
 | `RSSI_AT_1M` | −45 | Kalibreres |
 | `PATH_LOSS_EXPONENT` | 2.5 | Kalibreres |
 | `RSSI_MIN` | −90 | Svagere pakker ignoreres |
+| `ANCHORS` | 4 | Antal ankre i opstillingen |
+| `SPACING_M` | 2.0 | Meter mellem to naboankre i ringen |
+| `MIN_ANCHORS` | 2 | Ankre der skal til for en position |
+| `MAX_ANCHORS` | 32 | Ankre gatewayen kan holde styr på |
+| `ESPNOW_ENCRYPT` | true | Krypteret ESP-NOW. Højst 7 ankre (ESP32-grænse, tjekkes ved kompilering). Sæt `false` for flere |
 | `WINDOW_MS` | 2000 | Gennemsnit og beregning hvert 2. sekund |
 | `STALE_MS` | 6000 | Ældre målinger bruges ikke |
 | `FORGET_MS` | 60000 | Enheder glemmes efter 1 minut |
-| `MIN_ANCHORS` | 3 | Ankre der skal til for en position |
-| `PUBLISH_RAW` | false | Send rå RSSI (kun til kalibrering) |
+| `PUBLISH_RAW` | true | Send rå RSSI (kun til kalibrering) |
 
 ## Fejlfinding
 | Problem | Løsning |
 |---|---|
 | Ingen positioner | Mobilen sender næsten intet, når skærmen er slukket. Hold skærmen tændt og afspil fx en video under test |
-| Ankrene sender, men gatewayen modtager intet | Forkert MAC i `config.h`, forskellige nøgler i `secrets.h`, eller routeren har skiftet kanal. Genstart ankrene, så finder de kanalen igen |
-| Anker blinker hurtigt hele tiden | Den kan ikke finde `WIFI_SSID`. Tjek navnet i `secrets.h` |
+| Anker dobbeltblinker hele tiden | Den hører ikke gatewayen. Tjek at gatewayen kører og har wi-fi, og at `secrets.h` er ens på alle boards (samme `MQTT_USER` og `ESPNOW_PMK`) |
+| `A3 moved to a new board` gentages | To boards har samme nummer. Giv det ene et nyt nummer i Serial Monitor |
+| `Warning: A5 is higher than ANCHORS` | Ankrets nummer er større end `ANCHORS` i config.h. Ret tallet |
+| `no room for more encrypted anchors` | For mange krypterede ankre. Sæt `ESPNOW_ENCRYPT = false` |
 | `MQTT error 4/5` | Forkert MQTT-login |
 | Positionen hopper meget | Normalt for RSSI. Kalibrér igen, og hold ankrene i samme højde med fri antenne |
 
 ## Udskiftning og udbygning
-- **Andet signal end wi-fi** (fx BLE): skift kun snifferen i `src/anchor/`. Beskeden og gatewayen er uændrede.
+- **Flere ankre:** sæt `ANCHORS` op, upload, og giv det nye anker et nummer.
+- **Udskift et anker:** giv det nye board samme nummer. Gatewayen glemmer selv det gamle.
+- **Andet signal end wi-fi** (fx BLE): skift kun snifferen i `src/anchor/`. Beskederne og gatewayen er uændrede.
 - **Anden beregning** (fx vægtet centroid eller Kalman-filter): skift `lib/positioning/`. Testene viser, om den stadig virker.
-- **Mere end 4 ankre:** sæt `ANCHOR_COUNT` op og tilføj positioner og MAC'er. Trilaterationen bruger alle.
 - **ESP-MESH i stedet for ESP-NOW:** kun afsendelsen i ankeret og modtagelsen i gatewayen skal skiftes.
 - **Anden server:** `connectMqtt()` og `publish` i gatewayen er det eneste, der kender MQTT.
 
 ## Test
-Matematikken testes på computeren:
+Matematikken testes på computeren med 2, 3, 4, 6 og 9 ankre:
 ```
 g++ -std=c++17 -I lib/positioning hosttest/test_positioning.cpp lib/positioning/positioning.cpp -o hosttest/run
 ./hosttest/run

@@ -23,19 +23,25 @@ Trilateration: hver afstand er en cirkel om et anker, og positionen er der, hvor
 | **ESP-NOW til én gateway** | Lærerens anbefaling. Ingen router nødvendig for ankrene, kan krypteres |
 | ESP-MESH / painlessMesh | Kun nødvendigt, hvis ankrene ikke kan nå gatewayen. painlessMesh er ikke afprøvet med Arduino-ESP32 3.x |
 
-**Valg:** ESP-NOW. Vigtigt fund: ESP-NOW skal køre på samme kanal som routeren, som gatewayen er forbundet til, ellers kommer beskederne ikke frem, og der kommer ingen fejl. Derfor finder ankrene selv routerens kanal ved opstart.
+**Valg:** ESP-NOW. Vigtigt fund: ESP-NOW skal køre på samme kanal som routeren, som gatewayen er forbundet til, ellers kommer beskederne ikke frem, og der kommer ingen fejl. Derfor prøver ankrene kanal 1-13 ved opstart, til de hører gatewayen. Det virker også, når skolen har flere routere med samme navn på forskellige kanaler.
 Kilde: https://s0ren.github.io/FAG_17682_IoT_II/Features/esp_now_mesh.html
 
 ## Beslutninger
 | Beslutning | Begrundelse |
 |---|---|
-| 4 ankre i hjørnerne + 1 gateway | 3 er minimum, den 4. giver bedre præcision og tåler, at ét anker ikke hører mobilen |
+| 4 ankre i hjørnerne + 1 gateway | Standardopstillingen: den 4. giver bedre præcision og tåler, at ét anker ikke hører mobilen |
 | Gennemsnit over 2 s | RSSI svinger meget fra pakke til pakke |
 | Gatewayen beregner positionen | Én enhed har alle målinger, og ankrene forbliver simple |
 | Matematikken i sit eget bibliotek | Kan testes på computeren og skiftes ud |
 | Krypteret ESP-NOW (PMK + LMK) | Ellers kan alle på kanalen læse og forfalske målinger |
 | MQTT med TLS og login | Samme sikkerhed som i smiley-projektet |
-| Ignorer egne boards, beacons og routerens pakker | Ellers bliver vores eget udstyr og routeren "sporet" |
+| Lyt kun på datapakker fra enheder til routeren | Routere, beacons og ESP-NOW kommer ikke med. Og mobiler, der leder efter netværk, bruger en tilfældig MAC, som ville give falske enheder |
+| Gruppenummer i alle "hello"-beskeder | Flere hold kører samme program i samme lokale. Uden det kunne vores ankre parre med en anden gruppes gateway |
+| Fra 2 til mange ankre | 2 ankre giver positionen på linjen mellem dem, 3+ giver (x, y). Står alle på én linje, bruges de to nærmeste |
+| Ankrene finder selv gatewayen | Gatewayen siger "her er jeg", og ankrene svarer med nummer og position. Ingen MAC-adresser at skrive ind |
+| Ét program til alle boards | Rollen skrives i Serial Monitor og gemmes i boardet. Kun én ting at uploade |
+| Automatisk opstilling | Man skriver kun antal ankre og afstand i config. Ankrene får et nummer og stilles altid med uret rundt, så positionen regnes ud automatisk |
+| Kryptering kan slås fra | ESP32 kan højst have ca. 7 krypterede forbindelser. Skal der bruges flere ankre, kan krypteringen slås fra |
 
 ## Persondata (GDPR)
 
@@ -60,7 +66,7 @@ Bemærk: en hash med salt er **pseudonymisering**, ikke anonymisering. Den, der 
 ### Hvem kan få adgang, og kan nogen lytte med?
 | Trin | Beskyttelse |
 |---|---|
-| Anker → gateway | ESP-NOW krypteret med PMK/LMK |
+| Anker → gateway | ESP-NOW krypteret med PMK/LMK. Hello-beskederne er ukrypterede, men indeholder kun ankerets nummer og position |
 | Gateway → server | TLS med lærerens CA-certifikat og login |
 | Server | Kun brugere med login. ACL'en giver os kun adgang til `elever/<bruger>/` |
 | Koder og nøgler | `secrets.h`, som ikke er i git |

@@ -1,54 +1,52 @@
 #pragma once
 #include <stdint.h>
-#include "positioning.h"
 
 // ===== Alle centrale indstillinger samlet ét sted =====
 // Koder (wi-fi, MQTT, nøgler) ligger i secrets.h, som ikke er i git.
-
-// ---------- Området (meter) ----------
-const float AREA_WIDTH  = 2.0f;                      // B: mål jeres bord/lokale
-const float AREA_HEIGHT = 2.0f;                      // H
-
-// ---------- Ankrene ----------
-const int ANCHOR_COUNT = 4;
-// Set oppefra:   A1 ── A2     (0,0) er A1. x går mod højre, y går nedad.
-//                │      │
-//                A3 ── A4
-const Point ANCHOR_POS[ANCHOR_COUNT] = {
-  {0.0f,       0.0f},                                // A1 top venstre
-  {AREA_WIDTH, 0.0f},                                // A2 top højre
-  {0.0f,       AREA_HEIGHT},                         // A3 bund venstre
-  {AREA_WIDTH, AREA_HEIGHT},                         // A4 bund højre
-};
-
-// MAC-adresser: hvert board skriver sin egen MAC i Serial Monitor ved opstart.
-const uint8_t GATEWAY_MAC[6] = {0x0C, 0x8B, 0x95, 0x76, 0x20, 0x14};
-const uint8_t ANCHOR_MAC[ANCHOR_COUNT][6] = {
-  {0xB4, 0xBF, 0xE9, 0x04, 0xE1, 0x08},              // A1
-  {0xEC, 0x64, 0xC9, 0x85, 0x4F, 0xC8},              // A2
-  {0x40, 0x22, 0xD8, 0x07, 0x15, 0x10},              // A3
-  {0xCC, 0xDB, 0xA7, 0x1C, 0xA8, 0x6C},              // A4
-};
+// Hvert anker får sit nummer i Serial Monitor (gemmes i ankeret). Positionen regnes ud fra opstillingen nedenfor.
+// MAC-adresser og kanal skal ikke skrives nogen steder: ankrene finder selv gatewayen.
 
 // ---------- Radiomodel (kalibrér, se README) ----------
 const float RSSI_AT_1M         = -45.0f;             // målt RSSI 1 m fra et anker
 const float PATH_LOSS_EXPONENT = 2.5f;               // 2 = frit rum, 3-4 = indendørs med forhindringer
 const int   RSSI_MIN           = -90;                // svagere pakker ignoreres
 
+// ---------- Opstilling ----------
+// Skriv hvor mange ankre I bruger, og afstanden mellem to naboer. Så skal hvert anker kun have et nummer.
+// Ankrene stilles i en ring MED URET, set oppefra. A1 øverst til venstre, A2 til højre for den:
+//   2 ankre:  A1 ── A2        4 ankre:  A1 ── A2        3 ankre:  A1 ── A2
+//                                       │      │                    \  /
+//                                       A4 ── A3                     A3
+// 5, 6, 7, ... ankre: samme idé, en femkant, sekskant osv.
+const int   ANCHORS   = 4;                           // antal ankre (2, 3, 4, 5, ...)
+const float SPACING_M = 2.0f;                        // meter mellem to naboankre i ringen
+
+// ---------- Ankre ----------
+const int  MIN_ANCHORS    = 2;                       // 2 = position på linjen mellem dem, 3+ = (x, y)
+const int  MAX_ANCHORS    = 32;                      // så mange kan gatewayen holde styr på
+const bool ESPNOW_ENCRYPT = true;                    // krypteret ESP-NOW: højst 7 ankre (ESP32-grænse)
+                                                     // false: ubegrænset antal, men målingerne er ukrypterede
+
 // ---------- Tider ----------
-const unsigned long WINDOW_MS  = 2000;               // anker: gennemsnit over så lang tid
-const unsigned long STALE_MS   = 6000;               // gateway: ældre målinger bruges ikke
-const unsigned long FORGET_MS  = 60000;              // gateway: glem enheder, der ikke er set (dataminimering)
-const int           MIN_ANCHORS = 3;                 // mindst 3 ankre for at beregne (x, y)
-const int           MIN_SAMPLES = 2;                 // mindst 2 pakker i et vindue
+const unsigned long WINDOW_MS         = 2000;        // anker: gennemsnit over så lang tid
+const unsigned long STALE_MS          = 6000;        // gateway: ældre målinger bruges ikke
+const unsigned long FORGET_MS         = 60000;       // gateway: glem enheder, der ikke er set (dataminimering)
+const unsigned long GATEWAY_HELLO_MS  = 500;         // gateway melder sig så ofte
+const unsigned long ANCHOR_HELLO_MS   = 10000;       // anker melder sig så ofte (gatewayen kan være genstartet)
+const unsigned long LOST_GATEWAY_MS   = 30000;       // anker: intet hørt fra gatewayen så længe = led igen
+const int           MIN_SAMPLES       = 2;           // mindst 2 pakker i et vindue
 
 // ---------- MQTT ----------
 const char* const MQTT_HOST   = "wilsons.local";
 const int         MQTT_PORT   = 8883;                // TLS + login
-const bool        PUBLISH_RAW = true;               // true = send også rå RSSI (til kalibrering)
+const bool        PUBLISH_RAW = true;                // true = send også rå RSSI (til kalibrering)
 
 // ---------- Tid ----------
 const char* const TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3";   // dansk tid
 
 // ---------- Status-LED ----------
 const int LED_PIN = 2;                               // indbygget blå LED
+
+// ---------- Tjek ved kompilering ----------
+static_assert(ANCHORS >= MIN_ANCHORS && ANCHORS <= MAX_ANCHORS, "ANCHORS must be between 2 and 32");
+static_assert(!ESPNOW_ENCRYPT || ANCHORS <= 7, "Encrypted ESP-NOW allows max 7 anchors: set ESPNOW_ENCRYPT = false");
