@@ -5,9 +5,14 @@
 //   3 1.5 2        → anker 3 i en selvvalgt position (x, y i meter), fx til en skæv opstilling
 //   reset          → glem rollen og opstillingen
 // Kun på gatewayen:
-//   anchors 5      → antal ankre i ringen
-//   spacing 2.5    → meter mellem to naboankre
+//   anchors 4      → antal ankre i ringen
+//   spacing 4      → meter mellem to naboankre
+//   calib -55 3    → kalibrering: RSSI ved 1 m og n
 //   list           → vis opstillingen og de ankre, der er med
+//   devices        → enheder lige nu, med RSSI fra hvert anker
+//   watch db8      → følg kun denne enhed (slutning af id eller MAC)
+//   unwatch db8    → stop med at følge denne
+//   unwatch        → stop med at følge alle (alle spores igen)
 // Alt gemmes i boardets flash, så det kun skal gøres én gang.
 
 #include <Arduino.h>

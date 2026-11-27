@@ -7,12 +7,12 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <ESP32_NOW.h>
-#include <mbedtls/sha256.h>
 #include <mbedtls/platform_util.h>
 #include <math.h>
 #include "config.h"
 #include "protocol.h"
 #include "secrets.h"
+#include "device_id.h"
 #include "roles.h"
 
 namespace anchor {
@@ -88,18 +88,6 @@ void onUnknownSender(const esp_now_recv_info_t* info, const uint8_t* data, int l
 
 // ---------- Hjælpefunktioner ----------
 bool sameMac(const uint8_t* a, const uint8_t* b) { return memcmp(a, b, 6) == 0; }
-
-// SHA-256(salt + MAC), de første 8 byte bruges som anonymt id
-void hashMac(const uint8_t* mac, uint8_t* out) {
-  uint8_t input[64];
-  size_t saltLen = strnlen(HASH_SALT, sizeof(input) - 6);
-  memcpy(input, HASH_SALT, saltLen);
-  memcpy(input + saltLen, mac, 6);
-  uint8_t digest[32];
-  mbedtls_sha256(input, saltLen + 6, digest, 0);
-  memcpy(out, digest, DEVICE_ID_BYTES);
-  mbedtls_platform_zeroize(input, sizeof(input));
-}
 
 void printMac(const char* label, const uint8_t* mac) {
   Serial.printf("%s %02X:%02X:%02X:%02X:%02X:%02X\n", label, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -238,7 +226,7 @@ void loop() {
     m.type     = MSG_MEASUREMENT;
     m.anchorId = anchorId;
     m.seq      = seq++;
-    hashMac(batch[i].mac, m.deviceId);
+    deviceIdFromMac(batch[i].mac, m.deviceId);       // anonymt id, se device_id.h
     m.rssi     = (int8_t)lroundf((float)batch[i].rssiSum / batch[i].count);
     m.samples  = batch[i].count > 255 ? 255 : batch[i].count;
 

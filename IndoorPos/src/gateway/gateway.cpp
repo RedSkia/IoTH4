@@ -16,6 +16,7 @@
 #include "protocol.h"
 #include "positioning.h"
 #include "secrets.h"
+#include "device_id.h"
 #include "ca_cert.h"
 #include "roles.h"
 
@@ -71,7 +72,7 @@ const int MAX_TRACKED = 64;
 struct Tracked {
   bool          used;
   uint8_t       id[DEVICE_ID_BYTES];
-  int8_t        rssi[MAX_ANCHORS];                   // indeks = plads i anchors[]
+  float         rssi[MAX_ANCHORS];                   // udglattet RSSI, indeks = plads i anchors[]
   unsigned long seenAt[MAX_ANCHORS];                 // 0 = aldrig set af det anker
   unsigned long lastSeen;
 };
@@ -93,6 +94,32 @@ Tracked* findOrAdd(const uint8_t* id) {
   return t;
 }
 
+// ---------- Enheder set for nylig (kun anonyme id'er, ingen målinger) ----------
+// Så "watch db8" også kan finde en enhed, der ikke følges endnu. Glemmes efter FORGET_MS.
+const int MAX_RECENT = 32;
+
+struct Recent {
+  bool          used;
+  uint8_t       id[DEVICE_ID_BYTES];
+  unsigned long at;
+};
+
+Recent recent[MAX_RECENT];
+
+void rememberSeen(const uint8_t* id) {
+  Recent* slot = &recent[0];
+  for (Recent& r : recent) {
+    if (r.used && memcmp(r.id, id, DEVICE_ID_BYTES) == 0) { r.at = millis(); return; }
+    if (!r.used || millis() - r.at > FORGET_MS) { slot = &r; break; }   // ledig eller gammel plads
+    if (r.at < slot->at) slot = &r;                                      // ellers den ældste
+  }
+  slot->used = true;
+  memcpy(slot->id, id, DEVICE_ID_BYTES);
+  slot->at = millis();
+}
+
+bool recentlySeen(const Recent& r) { return r.used && millis() - r.at <= FORGET_MS; }
+
 // ---------- Opstilling (gemt i flash, ændres i Serial Monitor) ----------
 Preferences layoutStore;
 int         ringSize = DEFAULT_ANCHORS;              // antal ankre i ringen
@@ -103,13 +130,58 @@ bool validRingSize(int n) {
 }
 bool validSpacing(float m) { return m >= 0.1f && m <= 100.0f; }   // false for NAN
 
+// Radiomodel (kalibrering), også gemt i flash: "calib <rssi ved 1 m> <n>"
+float rssiAt1m   = RSSI_AT_1M;
+float pathLossN  = PATH_LOSS_EXPONENT;
+bool validRssiAt1m(float a) { return a >= -100.0f && a <= -10.0f; }
+bool validPathLoss(float n) { return n >= 1.0f && n <= 6.0f; }
+
+void loadFilter();                                   // længere nede
+
 void loadLayout() {
   layoutStore.begin("gateway", false);
   int   n = layoutStore.getInt("anchors", DEFAULT_ANCHORS);
   float m = layoutStore.getFloat("spacing", DEFAULT_SPACING_M);
-  ringSize = validRingSize(n) ? n : DEFAULT_ANCHORS;
-  spacing  = validSpacing(m)  ? m : DEFAULT_SPACING_M;
+  float a = layoutStore.getFloat("rssi1m", RSSI_AT_1M);
+  float e = layoutStore.getFloat("n", PATH_LOSS_EXPONENT);
+  ringSize  = validRingSize(n) ? n : DEFAULT_ANCHORS;
+  spacing   = validSpacing(m)  ? m : DEFAULT_SPACING_M;
+  rssiAt1m  = validRssiAt1m(a) ? a : RSSI_AT_1M;
+  pathLossN = validPathLoss(e) ? e : PATH_LOSS_EXPONENT;
+  loadFilter();
 }
+
+// ---------- Watch-liste: følg kun udvalgte enheder (gemt i flash) ----------
+// Tom liste  = alle enheder spores.
+// Ellers     = KUN enhederne på listen spores, sendes til MQTT og vises med RSSI fra hvert anker.
+//              Andre enheder smides væk med det samme (dataminimering).
+const int MAX_WATCHED = 16;
+uint8_t   watched[MAX_WATCHED][DEVICE_ID_BYTES];
+int       watchedCount = 0;
+
+void loadFilter() {
+  watchedCount = 0;
+  if (layoutStore.isKey("watch")) {
+    size_t len = layoutStore.getBytesLength("watch");
+    if (len % DEVICE_ID_BYTES == 0 && len <= sizeof(watched)) {
+      layoutStore.getBytes("watch", watched, len);
+      watchedCount = len / DEVICE_ID_BYTES;
+    }
+  }
+}
+
+void saveFilter() {
+  if (watchedCount > 0)              layoutStore.putBytes("watch", watched, watchedCount * DEVICE_ID_BYTES);
+  else if (layoutStore.isKey("watch")) layoutStore.remove("watch");
+}
+
+int watchedIndex(const uint8_t* id) {
+  for (int i = 0; i < watchedCount; i++)
+    if (memcmp(watched[i], id, DEVICE_ID_BYTES) == 0) return i;
+  return -1;
+}
+
+bool passesFilter(const uint8_t* id) { return watchedCount == 0 || watchedIndex(id) >= 0; }
 
 void forgetSettings() {
   Preferences store;
@@ -244,9 +316,14 @@ void timeText(char* out, size_t size, time_t now) {  // fx "2026-11-26 10:15:02 
 void handleMeasurement(Anchor& anchor, const Measurement& m) {
   if (m.anchorId != anchor.id) return;               // passer ikke med ankerets hello
 
+  rememberSeen(m.deviceId);                          // kun id'et, så det kan vælges med watch
+  if (!passesFilter(m.deviceId)) return;             // watch-liste: andre enheders målinger gemmes slet ikke
+
   int slot = &anchor - anchors;
   Tracked* t = findOrAdd(m.deviceId);
-  t->rssi[slot]   = m.rssi;
+  bool fresh = t->seenAt[slot] != 0 && millis() - t->seenAt[slot] <= STALE_MS;
+  t->rssi[slot]   = fresh ? t->rssi[slot] + RSSI_SMOOTHING * (m.rssi - t->rssi[slot])   // udglat støj
+                          : m.rssi;                                                     // første måling
   t->seenAt[slot] = millis();
   t->lastSeen     = millis();
 
@@ -292,25 +369,35 @@ void computePositions() {
   unsigned long now = millis();
   for (Tracked& t : tracked) {
     if (!t.used) continue;
-    if (now - t.lastSeen > FORGET_MS) {              // dataminimering: glem gamle enheder
+    if (now - t.lastSeen > FORGET_MS || !passesFilter(t.id)) {   // dataminimering: glem gamle/ikke-fulgte enheder
       t.used = false;
       continue;
     }
 
     Point pos[MAX_ANCHORS];
     float dist[MAX_ANCHORS];
+    int   used[MAX_ANCHORS];                         // hvilke pladser i anchors[] der er med
     int   count = 0;
     for (int s = 0; s < MAX_ANCHORS; s++) {
       if (!anchors[s].used || t.seenAt[s] == 0 || now - t.seenAt[s] > STALE_MS) continue;
       pos[count]  = anchors[s].pos;
-      dist[count] = rssiToDistance(t.rssi[s], RSSI_AT_1M, PATH_LOSS_EXPONENT);
+      dist[count] = rssiToDistance(t.rssi[s], rssiAt1m, pathLossN);
+      used[count] = s;
       count++;
     }
-    if (count < MIN_ANCHORS) continue;
-
     Point p;
-    if (!locate(pos, dist, count, p)) continue;
-    p = clampToBox(p, boxMin, boxMax);
+    bool   located = count >= MIN_ANCHORS && estimate(pos, dist, count, boxMin, boxMax, p);
+    String hex     = idToHex(t.id);
+
+    // watch: RSSI og afstand fra hvert anker. Vises også med kun ét anker (bruges til kalibrering)
+    if (watchedCount > 0 && count > 0 && !consoleBusy()) {
+      Serial.printf("%s ", hex.c_str() + hex.length() - 4);
+      for (int i = 0; i < count; i++)
+        Serial.printf(" A%d %4.0f dBm %4.1f m |", anchors[used[i]].id, t.rssi[used[i]], dist[i]);
+      if (located) Serial.printf("  -> (%.2f, %.2f)\n", p.x, p.y);
+      else         Serial.printf("  (need %d anchors for a position)\n", MIN_ANCHORS);
+    }
+    if (!located) continue;
 
     time_t ts = time(nullptr);
     if (ts < 1700000000) {                           // tiden er ikke hentet (NTP) endnu: ingen 1970-data
@@ -321,9 +408,9 @@ void computePositions() {
     timeText(clock, sizeof(clock), ts);
     char json[160];
     snprintf(json, sizeof(json), "{\"id\":\"%s\",\"time\":\"%s\",\"ts\":%ld,\"x\":%.2f,\"y\":%.2f,\"anchors\":%d}",
-             idToHex(t.id).c_str(), clock, (long)ts, p.x, p.y, count);
+             hex.c_str(), clock, (long)ts, p.x, p.y, count);
     if (mqtt.connected()) mqtt.publish(topicPosition.c_str(), json);
-    if (!consoleBusy()) Serial.println(json);        // MQTT får den altid, skærmen kun når ingen skriver
+    if (!consoleBusy() && watchedCount == 0) Serial.println(json);   // MQTT får den altid, skærmen kun når ingen skriver
   }
 }
 
@@ -338,6 +425,116 @@ void printAnchors() {
 
 void printLayout() {
   Serial.printf("Layout: %d anchors, %.2f m apart (saved on this board)\n", ringSize, spacing);
+  Serial.printf("Calibration: RSSI at 1 m = %.1f dBm, n = %.2f\n", rssiAt1m, pathLossN);
+  if (watchedCount == 0) Serial.println("Watching: all devices");
+  else                   Serial.printf("Watching: %d devices (only these are tracked)\n", watchedCount);
+}
+
+// "devices": alle enheder lige nu, med RSSI fra hvert anker. Bruges til at finde sin egen mobil.
+void printDevices() {
+  unsigned long now = millis();
+  int shown = 0;
+  for (Tracked& t : tracked) {
+    if (!t.used) continue;
+    Serial.printf("  %s ", idToHex(t.id).c_str());
+    for (int s = 0; s < MAX_ANCHORS; s++) {
+      if (!anchors[s].used) continue;
+      if (t.seenAt[s] == 0 || now - t.seenAt[s] > STALE_MS) Serial.printf(" A%d   -- |", anchors[s].id);
+      else                                                 Serial.printf(" A%d %4.0f |", anchors[s].id, t.rssi[s]);
+    }
+    Serial.printf("  last seen %lu s ago\n", (now - t.lastSeen) / 1000);
+    shown++;
+  }
+  // Med watch-liste: vis også de andre enheder, der er set (kun id, ingen målinger), så de kan vælges
+  if (watchedCount) {
+    for (Recent& r : recent) {
+      if (!recentlySeen(r) || watchedIndex(r.id) >= 0) continue;
+      Serial.printf("  %s  not watched (watch %s to add it)\n", idToHex(r.id).c_str(),
+                    idToHex(r.id).c_str() + DEVICE_ID_BYTES * 2 - 4);
+      shown++;
+    }
+  }
+  if (!shown) Serial.println("  No devices right now. Is the phone on the WiFi with the screen on?");
+}
+
+void printWatched() {
+  if (watchedCount == 0) {
+    Serial.println("Watching: all devices");
+    return;
+  }
+  Serial.printf("Watching only (%d of max %d):\n", watchedCount, MAX_WATCHED);
+  for (int i = 0; i < watchedCount; i++) Serial.printf("  %s\n", idToHex(watched[i]).c_str());
+}
+
+bool isHex(const char* s) {
+  for (; *s; s++) if (!isxdigit((unsigned char)*s)) return false;
+  return true;
+}
+
+// Finder et fuldt id ud fra det, der er skrevet:
+//   en MAC (aa:bb:cc:dd:ee:ff, aa-bb-.. eller aabbccddeeff) → samme hash som ankeret laver
+//   et helt id (16 tegn)
+//   slutningen af et id (3-11 eller 13-15 tegn, fx db8) → søges blandt enheder set for nylig
+bool resolveDevice(const char* text, uint8_t* out) {
+  unsigned int b[6];
+  int used = 0;
+  if ((sscanf(text, "%2x:%2x:%2x:%2x:%2x:%2x%n", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5], &used) == 6 ||
+       sscanf(text, "%2x-%2x-%2x-%2x-%2x-%2x%n", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5], &used) == 6) &&
+      text[used] == '\0') {
+    uint8_t mac[6];
+    for (int i = 0; i < 6; i++) mac[i] = b[i];
+    deviceIdFromMac(mac, out);
+    memset(mac, 0, sizeof(mac));
+    return true;
+  }
+
+  size_t len = strlen(text);
+  if (len == 12 && isHex(text)) {                    // MAC uden skilletegn (aabbccddeeff)
+    uint8_t mac[6];
+    for (int i = 0; i < 6; i++) {
+      unsigned int v;
+      sscanf(text + i * 2, "%2x", &v);
+      mac[i] = v;
+    }
+    deviceIdFromMac(mac, out);
+    memset(mac, 0, sizeof(mac));
+    return true;
+  }
+  if (len < 3 || len > DEVICE_ID_BYTES * 2 || !isHex(text)) {
+    Serial.println("Write a MAC (aa:bb:cc:dd:ee:ff) or the end of a device id (at least 3 characters, see: devices)");
+    return false;
+  }
+  if (len == DEVICE_ID_BYTES * 2) {                  // helt id
+    for (int i = 0; i < DEVICE_ID_BYTES; i++) {
+      unsigned int v;
+      sscanf(text + i * 2, "%2x", &v);
+      out[i] = v;
+    }
+    return true;
+  }
+
+  // Slutning af et id: skal passe på præcis én enhed (på listen, fulgt nu eller set for nylig)
+  const int MAX_MATCHES = 8;
+  uint8_t   found[MAX_MATCHES][DEVICE_ID_BYTES];
+  int       matches = 0;
+  auto consider = [&](const uint8_t* id) {
+    if (!idToHex(id).endsWith(text)) return;
+    for (int i = 0; i < matches && i < MAX_MATCHES; i++)
+      if (memcmp(found[i], id, DEVICE_ID_BYTES) == 0) return;          // samme enhed to steder
+    if (matches < MAX_MATCHES) memcpy(found[matches], id, DEVICE_ID_BYTES);
+    matches++;
+  };
+  for (int i = 0; i < watchedCount; i++) consider(watched[i]);
+  for (Tracked& t : tracked) if (t.used) consider(t.id);
+  for (Recent& r : recent) if (recentlySeen(r)) consider(r.id);
+
+  if (matches == 1) {
+    memcpy(out, found[0], DEVICE_ID_BYTES);
+    return true;
+  }
+  if (matches == 0) Serial.printf("No device ends with %s right now (see: devices)\n", text);
+  else              Serial.printf("%d devices end with %s - write more characters\n", matches, text);
+  return false;
 }
 
 void printList() {
@@ -358,20 +555,94 @@ void printList() {
 
 void printHelp() {
   Serial.println("Gateway:");
-  Serial.println("  anchors <n>   = number of anchors, e.g. anchors 5");
-  Serial.println("  spacing <m>   = meters between neighbour anchors, e.g. spacing 2.5");
-  Serial.println("  list          = show layout and anchors");
+  Serial.println("  anchors 4     = number of anchors");
+  Serial.println("  spacing 4     = meters between neighbour anchors");
+  Serial.println("  calib -55 3   = RSSI at 1 m and n (calibration)");
+  Serial.println("  list          = anchors and settings");
+  Serial.println("  devices       = devices seen now");
+  Serial.println("  watch         = show the watch list");
+  Serial.println("  watch db8     = only track this device (part of id, full id or MAC)");
+  Serial.println("  unwatch db8   = stop watching this device");
+  Serial.println("  unwatch       = stop watching all (track everyone)");
+}
+
+// true, hvis linjen starter med ordet efterfulgt af et mellemrum (så "watchdb8" ikke tæller som "watch db8")
+bool isCommand(const char* line, const char* word) {
+  size_t len = strlen(word);
+  return strncmp(line, word, len) == 0 && line[len] == ' ';
 }
 
 bool command(const char* line) {
   int   n;
   float m;
   int   used = 0;                                    // %n: hele linjen skal passe, fx ikke "anchors 5x"
+  float e;
   if (strcmp(line, "list") == 0) {
     printList();
     return true;
   }
-  if (sscanf(line, "anchors %d%n", &n, &used) == 1 && line[used] == '\0') {
+  if (strcmp(line, "devices") == 0) {
+    printDevices();
+    return true;
+  }
+  // ----- watch / unwatch -----
+  char    arg[24];
+  uint8_t id[DEVICE_ID_BYTES];
+  if (strcmp(line, "watch") == 0) {
+    printWatched();
+    return true;
+  }
+  if (strcmp(line, "unwatch") == 0 || strcmp(line, "unwatch all") == 0) {   // uden navn = alle
+    watchedCount = 0;
+    saveFilter();
+    printWatched();
+    return true;
+  }
+  if (isCommand(line, "watch") && sscanf(line, "watch %23s%n", arg, &used) == 1 && line[used] == '\0') {
+    if (!resolveDevice(arg, id)) return true;
+    if (watchedIndex(id) >= 0) {
+      Serial.printf("Already watching %s\n", idToHex(id).c_str());
+      return true;
+    }
+    if (watchedCount >= MAX_WATCHED) {
+      Serial.printf("Max %d devices. Unwatch one first\n", MAX_WATCHED);
+      return true;
+    }
+    memcpy(watched[watchedCount++], id, DEVICE_ID_BYTES);
+    for (Tracked& t : tracked) if (t.used && watchedIndex(t.id) < 0) t.used = false;   // glem de andre nu
+    saveFilter();
+    printWatched();
+    return true;
+  }
+  if (isCommand(line, "unwatch") && sscanf(line, "unwatch %23s%n", arg, &used) == 1 && line[used] == '\0') {
+    if (!resolveDevice(arg, id)) return true;
+    int i = watchedIndex(id);
+    if (i < 0) {
+      Serial.printf("Not watching %s\n", idToHex(id).c_str());
+      return true;
+    }
+    memmove(watched[i], watched[i + 1], (watchedCount - i - 1) * DEVICE_ID_BYTES);
+    watchedCount--;
+    if (watchedCount > 0)                            // ikke fulgt mere: glem dens målinger med det samme
+      for (Tracked& t : tracked) if (t.used && memcmp(t.id, id, DEVICE_ID_BYTES) == 0) t.used = false;
+    saveFilter();
+    printWatched();
+    return true;
+  }
+  if (isCommand(line, "calib") && sscanf(line, "calib %f %f%n", &m, &e, &used) == 2 && line[used] == '\0') {
+    if (!validRssiAt1m(m) || !validPathLoss(e)) {
+      Serial.println("Use: calib <RSSI at 1 m, -100 to -10> <n, 1 to 6>, e.g. calib -55 3");
+      return true;
+    }
+    rssiAt1m  = m;
+    pathLossN = e;
+    layoutStore.putFloat("rssi1m", m);
+    layoutStore.putFloat("n", e);
+    Serial.println("Saved.");
+    printLayout();
+    return true;
+  }
+  if (isCommand(line, "anchors") && sscanf(line, "anchors %d%n", &n, &used) == 1 && line[used] == '\0') {
     if (!validRingSize(n)) {
       int maxN = ESPNOW_ENCRYPT ? MAX_ENCRYPTED_ANCHORS : MAX_ANCHORS;
       Serial.printf("Anchors must be %d-%d%s\n", MIN_ANCHORS, maxN,
@@ -381,7 +652,7 @@ bool command(const char* line) {
     ringSize = n;
     layoutStore.putInt("anchors", n);
   }
-  else if (sscanf(line, "spacing %f%n", &m, &used) == 1 && line[used] == '\0') {
+  else if (isCommand(line, "spacing") && sscanf(line, "spacing %f%n", &m, &used) == 1 && line[used] == '\0') {
     if (!validSpacing(m)) {
       Serial.println("Spacing must be 0.1-100 m");
       return true;

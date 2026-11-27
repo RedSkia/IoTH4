@@ -29,3 +29,10 @@ Point ringPosition(int number, int total, float spacing);
 
 // Holder punktet inden for rektanglet min..max.
 Point clampToBox(Point p, Point min, Point max);
+
+// Robust position til støjende RSSI (det gatewayen bruger):
+//  - 3+ ankre: vægtet mindste kvadraters metode (Gauss-Newton) direkte på afstandene,
+//    holdt inden for min..max. Nære ankre vægter mest, fordi deres afstand er mest præcis.
+//    Starter i et vægtet midtpunkt, så én dårlig måling ikke kaster positionen ud til kanten.
+//  - 2 ankre: positionen på linjen mellem dem.
+bool estimate(const Point* anchors, const float* distances, int count, Point min, Point max, Point& result);

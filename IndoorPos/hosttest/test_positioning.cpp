@@ -91,6 +91,31 @@ int main() {
   for (int i = 0; i < 3; i++) r3[i] = ringPosition(i + 1, 3, 2);
   check("Ring of 3 can locate a phone", solve(r3, 3, {1.0f, 0.6f}, p) && near(p, {1.0f, 0.6f}, 0.01f));
 
+  // Robust metode (estimate), som gatewayen bruger
+  Point sq[4] = {{0, 0}, {4, 0}, {4, 4}, {0, 4}};
+  Point lo = {0, 0}, hi = {4, 4};
+  auto exact = [&](Point truth, Point& out) {
+    float dd[4];
+    for (int i = 0; i < 4; i++) dd[i] = dist(sq[i], truth);
+    return estimate(sq, dd, 4, lo, hi, out);
+  };
+  check("estimate: exact distances, middle",       exact({2, 2}, p) && near(p, {2, 2}, 0.02f));
+  check("estimate: exact distances, near A1",      exact({0.5f, 0.7f}, p) && near(p, {0.5f, 0.7f}, 0.02f));
+  check("estimate: exact distances, near A3",      exact({3.6f, 3.2f}, p) && near(p, {3.6f, 3.2f}, 0.02f));
+  check("estimate: 6-anchor ring",                 [&] { float dd[6]; for (int i = 0; i < 6; i++) dd[i] = dist(r[i], {1.8f, 1.5f});
+                                                         Point mn = {0, 0}, mx = {4, 4};
+                                                         return estimate(r, dd, 6, mn, mx, p) && near(p, {1.8f, 1.5f}, 0.02f); }());
+  float bad[4] = {12, 12, 12, 12};                   // alle langt væk (ukalibreret): bliv i midten, ikke i et hjørne
+  check("estimate: all far gives the middle",      estimate(sq, bad, 4, lo, hi, p) && near(p, {2, 2}, 0.05f));
+  float wild[4] = {1.0f, 3.0f, 30.0f, 3.0f};       // ét vildt anker må ikke trække positionen langt væk fra A1
+  check("estimate: one wild anchor stays near A1", estimate(sq, wild, 4, lo, hi, p) && near(p, {0.7f, 0.7f}, 1.0f));
+  check("estimate: stays inside the box",          estimate(sq, wild, 4, lo, hi, p) && p.x >= 0 && p.y >= 0 && p.x <= 4 && p.y <= 4);
+  float two[2] = {1, 3};
+  check("estimate: 2 anchors on the line",         estimate(line2, two, 2, {0, 0}, {3, 0}, p) && near(p, {1.0f / 6, 0}, 0.02f));
+  float allFar[4] = {100, 101, 99, 100};             // ukalibreret: alle meget langt væk, skal stadig køre til ro
+  check("estimate: very large distances converge", estimate(sq, allFar, 4, lo, hi, p) && near(p, {2, 2}, 0.5f));
+  check("estimate: fewer than 2 rejected",         !estimate(sq, one, 1, lo, hi, p));
+
   printf("\n%s (%d failed)\n", fails ? "TESTS FAILED" : "ALL TESTS PASSED", fails);
   return fails ? 1 : 0;
 }

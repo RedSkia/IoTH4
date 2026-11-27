@@ -10,6 +10,9 @@
 const float RSSI_AT_1M         = -45.0f;             // målt RSSI 1 m fra et anker
 const float PATH_LOSS_EXPONENT = 2.5f;               // 2 = frit rum, 3-4 = indendørs med forhindringer
 const int   RSSI_MIN           = -90;                // svagere pakker ignoreres
+const float RSSI_SMOOTHING     = 0.5f;               // 0-1: lavere = roligere position, men langsommere
+// RSSI_AT_1M og PATH_LOSS_EXPONENT er startværdier. Skriv "calib -55 3" på gatewayen for at
+// ændre dem uden upload (gemmes i flash).
 
 // ---------- Opstilling (startværdier) ----------
 // Antal ankre og afstand ændres i gatewayens Serial Monitor, uden at uploade igen:

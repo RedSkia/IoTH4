@@ -43,6 +43,7 @@ Virker med **2 ankre** (position på en linje) og **3 eller flere** (position i 
    - `anchors 4` → antal ankre
    - `spacing 2` → meter mellem to naboankre
    - `list` → vis opstillingen, og hvilke ankre der er med
+   - alle kommandoer: se [Kommandoer på gatewayen](#kommandoer-på-gatewayen)
 5. Stil ankrene op som vist nedenfor, og tænd alle boards. Færdig.
 
 Alt gemmes i boardets flash, så det kun skal skrives én gang. Ingen ny upload, når opstillingen ændres.
@@ -61,12 +62,30 @@ Alt gemmes i boardets flash, så det kun skal skrives én gang. Ingen ny upload,
 - **Anker slukket?** Gatewayen fjerner det efter 30 sekunder (`Anchor A3 left`) og regner videre med resten. Tændes det igen, kommer det selv med.
 - **Skift rolle:** skriv en ny kommando, eller `reset` for at starte forfra (glemmer også opstillingen).
 
+## Kommandoer på gatewayen
+| Kommando | Gør |
+|---|---|
+| `anchors 4` | Antal ankre |
+| `spacing 4` | Meter mellem to naboankre |
+| `calib -55 3` | Kalibrering: RSSI ved 1 m og `n` |
+| `list` | Ankre og indstillinger |
+| `devices` | Enheder lige nu, med RSSI fra hvert anker |
+| `watch` | Vis watch-listen |
+| `watch db8` | Følg **kun** denne enhed. Skriv slutningen af id'et eller mobilens MAC (`watch aa:bb:cc:dd:ee:ff`). Kan gentages for flere |
+| `unwatch db8` | Stop med at følge denne enhed |
+| `unwatch` | Stop med at følge alle (alle spores igen) |
+
+Alt gemmes i gatewayens flash. Når der er enheder på watch-listen, bliver alle andre smidt væk med det samme og sendes ikke til MQTT. Skærmen viser så RSSI og afstand fra hvert anker i stedet for JSON. `devices` viser stadig de andre enheders id, så de kan tilføjes med `watch`.
+
+**Mobilens MAC:** mobiler bruger en "privat" MAC pr. netværk. Den står under wi-fi-indstillingerne for `IoT_H3/4` (iPhone: *Privat wi-fi-adresse*, Android: *MAC-adresse* under netværksdetaljer).
+
 ## Kalibrering
-Afstanden beregnes med `d = 10^((RSSI_AT_1M − RSSI) / (10 · n))`.
-1. Sæt `PUBLISH_RAW = true`, og upload gatewayen. Rå målinger kommer nu på `elever/<bruger>/rssi`.
-2. Hold mobilen 1 m fra et anker. Gennemsnittet af RSSI er `RSSI_AT_1M`.
-3. Gentag ved 2, 3 og 4 m. Regn `n = (RSSI_AT_1M − RSSI) / (10 · log10(d))` ud, og tag gennemsnittet. Det er `PATH_LOSS_EXPONENT`.
-4. Skriv tallene i `config.h`, og sæt `PUBLISH_RAW = false`.
+Afstanden beregnes med `d = 10^((a − RSSI) / (10 · n))`, hvor `a` er RSSI ved 1 m.
+1. Skriv `watch <jeres mobil>` på gatewayen. Nu vises RSSI fra hvert anker.
+2. Hold mobilen 1 m fra A1 i ½ minut. Gennemsnittet af A1's dBm er `a`.
+3. Hold den 4 m fra A1. Regn `n = (a − RSSI) / (10 · log10(4))` ud, dvs. `n = (a − RSSI) / 6`.
+4. Skriv `calib <a> <n>`, fx `calib -55 3`. Det virker med det samme, og ingen upload er nødvendig.
+5. Sæt `PUBLISH_RAW = false` i `config.h`, når I er færdige (det sender rå målinger til MQTT).
 
 ## Data (MQTT)
 Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
@@ -86,8 +105,9 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 ## Indstillinger (`include/config.h`)
 | Navn | Standard | Betyder |
 |---|---|---|
-| `RSSI_AT_1M` | −45 | Kalibreres |
-| `PATH_LOSS_EXPONENT` | 2.5 | Kalibreres |
+| `RSSI_AT_1M` | −45 | Startværdi. Ændres med `calib` på gatewayen |
+| `PATH_LOSS_EXPONENT` | 2.5 | Startværdi. Ændres med `calib` på gatewayen |
+| `RSSI_SMOOTHING` | 0.5 | Udglatning af RSSI. Lavere = roligere, men langsommere |
 | `RSSI_MIN` | −90 | Svagere pakker ignoreres |
 | `DEFAULT_ANCHORS` | 4 | Antal ankre, indtil der er skrevet `anchors <n>` på gatewayen |
 | `DEFAULT_SPACING_M` | 2.0 | Meter mellem naboankre, indtil der er skrevet `spacing <m>` |

@@ -72,6 +72,54 @@ Point clampToBox(Point p, Point min, Point max) {
   return p;
 }
 
+bool estimate(const Point* anchors, const float* distances, int count, Point min, Point max, Point& result) {
+  if (count < 2) return false;
+  if (count == 2) {
+    result = clampToBox(alongLine(anchors[0], anchors[1], distances[0], distances[1]), min, max);
+    return true;
+  }
+
+  // Vægt = 1/d²: RSSI-fejl vokser med afstanden, så nære ankre er mest til at stole på
+  float w[64];
+  if (count > 64) count = 64;
+  float sum = 0;
+  Point p = {0, 0};
+  for (int i = 0; i < count; i++) {
+    float d = distances[i] > 0.3f ? distances[i] : 0.3f;
+    w[i] = 1.0f / (d * d);
+    sum += w[i];
+    p.x += w[i] * anchors[i].x;
+    p.y += w[i] * anchors[i].y;
+  }
+  p = clampToBox({p.x / sum, p.y / sum}, min, max);  // start: vægtet midtpunkt
+
+  // Gauss-Newton: minimér Σ w·(|p - anker| - d)², et lille skridt ad gangen, inden for området
+  const float damping = 1e-3f * sum;                 // lille i forhold til vægtene, så den aldrig dividerer med 0
+  for (int iter = 0; iter < 30; iter++) {
+    float h11 = damping, h12 = 0, h22 = damping, g1 = 0, g2 = 0;
+    for (int i = 0; i < count; i++) {
+      float dx = p.x - anchors[i].x;
+      float dy = p.y - anchors[i].y;
+      float r  = sqrtf(dx * dx + dy * dy);
+      if (r < 1e-3f) r = 1e-3f;
+      float jx = dx / r, jy = dy / r, res = r - distances[i];
+      h11 += w[i] * jx * jx;
+      h12 += w[i] * jx * jy;
+      h22 += w[i] * jy * jy;
+      g1  += w[i] * jx * res;
+      g2  += w[i] * jy * res;
+    }
+    float det = h11 * h22 - h12 * h12;
+    if (!(fabsf(det) > 1e-20f)) break;
+    Point next = clampToBox({p.x - (h22 * g1 - h12 * g2) / det, p.y - (h11 * g2 - h12 * g1) / det}, min, max);
+    float moved = fabsf(next.x - p.x) + fabsf(next.y - p.y);
+    p = next;
+    if (moved < 1e-3f) break;
+  }
+  result = p;
+  return true;
+}
+
 static Point ringCorner(int index, int total, float radius) {
   // Hjørnerne ligger på en cirkel. A1 og A2 danner den øverste kant, så A1 er øverst til venstre.
   // Med y nedad går voksende vinkel med uret.
