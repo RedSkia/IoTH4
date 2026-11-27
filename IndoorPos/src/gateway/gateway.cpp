@@ -314,7 +314,7 @@ void computePositions() {
 
     time_t ts = time(nullptr);
     if (ts < 1700000000) {                           // tiden er ikke hentet (NTP) endnu: ingen 1970-data
-      Serial.println("No valid time yet - position not published");
+      if (!consoleBusy()) Serial.println("No valid time yet - position not published");
       return;
     }
     char clock[32];
@@ -323,7 +323,7 @@ void computePositions() {
     snprintf(json, sizeof(json), "{\"id\":\"%s\",\"time\":\"%s\",\"ts\":%ld,\"x\":%.2f,\"y\":%.2f,\"anchors\":%d}",
              idToHex(t.id).c_str(), clock, (long)ts, p.x, p.y, count);
     if (mqtt.connected()) mqtt.publish(topicPosition.c_str(), json);
-    Serial.println(json);
+    if (!consoleBusy()) Serial.println(json);        // MQTT får den altid, skærmen kun når ingen skriver
   }
 }
 
@@ -366,11 +366,12 @@ void printHelp() {
 bool command(const char* line) {
   int   n;
   float m;
+  int   used = 0;                                    // %n: hele linjen skal passe, fx ikke "anchors 5x"
   if (strcmp(line, "list") == 0) {
     printList();
     return true;
   }
-  if (sscanf(line, "anchors %d", &n) == 1) {
+  if (sscanf(line, "anchors %d%n", &n, &used) == 1 && line[used] == '\0') {
     if (!validRingSize(n)) {
       int maxN = ESPNOW_ENCRYPT ? MAX_ENCRYPTED_ANCHORS : MAX_ANCHORS;
       Serial.printf("Anchors must be %d-%d%s\n", MIN_ANCHORS, maxN,
@@ -380,7 +381,7 @@ bool command(const char* line) {
     ringSize = n;
     layoutStore.putInt("anchors", n);
   }
-  else if (sscanf(line, "spacing %f", &m) == 1) {
+  else if (sscanf(line, "spacing %f%n", &m, &used) == 1 && line[used] == '\0') {
     if (!validSpacing(m)) {
       Serial.println("Spacing must be 0.1-100 m");
       return true;
@@ -463,7 +464,7 @@ void loop() {
   static unsigned long lastStatus = 0;
   if (millis() - lastStatus >= 10000) {
     lastStatus = millis();
-    printAnchors();
+    if (!consoleBusy()) printAnchors();
   }
   delay(10);
 }

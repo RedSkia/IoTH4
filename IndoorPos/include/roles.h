@@ -18,3 +18,7 @@ void forgetSettings();                               // slet opstillingen i flas
 
 // Læser kommandoer fra Serial Monitor (g, <nummer> <x> <y>, reset). Kaldes ofte af begge roller.
 void handleConsole();
+
+// true, mens nogen er i gang med at skrive en kommando. Løbende log holder pause imens,
+// så den ikke blandes ind i det, der skrives.
+bool consoleBusy();

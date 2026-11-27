@@ -253,8 +253,9 @@ void loop() {
 
   mbedtls_platform_zeroize(batch, sizeof(batch));    // rå MAC'er slettes (compileren kan ikke fjerne det)
   int delivered = gateway->delivered - deliveredBefore;
-  Serial.printf("Window: %d devices, %d delivered of %d, %lu failed total\n",
-                n, delivered, tried, (unsigned long)gateway->failed);
+  if (!consoleBusy())
+    Serial.printf("Window: %d devices, %d delivered of %d, %lu failed total\n",
+                  n, delivered, tried, (unsigned long)gateway->failed);
 
   // Gatewayen er slukket eller har skiftet kanal (routeren kan skifte): start forfra og led igen
   if (millis() - gateway->lastHeard > LOST_GATEWAY_MS) {

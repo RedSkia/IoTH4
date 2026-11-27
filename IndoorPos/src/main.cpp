@@ -41,6 +41,7 @@ void saveAndRestart(const char* text) {
 
 void runCommand(String line) {
   line.trim();
+  String typed = line;                               // som skrevet, til fejlbeskeden
   line.toLowerCase();
   int   id;
   float x, y;
@@ -58,8 +59,13 @@ void runCommand(String line) {
     // klaret af gatewayen
   }
   else {
-    int parsed = sscanf(line.c_str(), "%d %f %f", &id, &x, &y);
-    if ((parsed == 1 || parsed == 3) && id >= 1 && id <= 255) {
+    // Hele linjen skal passe (%n = antal tegn læst), ellers bliver fx "3x" til anker 3
+    const char* s = line.c_str();
+    int  used     = 0;
+    int  parsed   = 0;
+    if (sscanf(s, "%d %f %f%n", &id, &x, &y, &used) == 3 && s[used] == '\0') parsed = 3;
+    else if (sscanf(s, "%d%n", &id, &used) == 1 && s[used] == '\0')        parsed = 1;
+    if (parsed && id >= 1 && id <= 255 && (parsed == 1 || (isfinite(x) && isfinite(y)))) {
       if (parsed == 1) x = y = NAN;                  // NAN = gatewayen regner positionen ud
       settings.putUChar("role", ROLE_ANCHOR);
       settings.putUChar("id", id);
@@ -69,23 +75,44 @@ void runCommand(String line) {
       else             Serial.printf("Saved: anchor A%d at (%.2f, %.2f)\n", id, x, y);
       saveAndRestart("");
     }
-    Serial.println("Unknown command.");
+    Serial.printf("Unknown command: \"%s\"\n", typed.c_str());
     printHelp();
   }
 }
 
+unsigned long lastKeyAt = 0;
+
+bool consoleBusy() {                                 // glemt halvskrevet linje: log kører igen efter 20 s
+  return inputLine.length() > 0 && millis() - lastKeyAt < 20000;
+}
+
 void handleConsole() {
+  static bool escape  = false;                       // midt i en piletast o.l. (ESC [ A)
+  static bool tooLong = false;
   while (Serial.available()) {
-    char c = Serial.read();
+    int c = Serial.read();
+    lastKeyAt = millis();
+    if (escape) {                                    // spring resten af tastekoden over
+      if (c != '[' && !(c >= '0' && c <= '9') && c != ';') escape = false;
+      continue;
+    }
+    if (c == 27) { escape = true; continue; }
+    if (c == '\t') c = ' ';
+
     if (c == '\r' || c == '\n') {
+      if (tooLong)                      Serial.println("\nLine too long - ignored");
+      else if (inputLine.length() > 0) { Serial.println(); runCommand(inputLine); }
+      inputLine = "";
+      tooLong   = false;
+    } else if (c == 8 || c == 127) {                 // backspace: slet sidste tegn
       if (inputLine.length() > 0) {
-        Serial.println();
-        runCommand(inputLine);
-        inputLine = "";
+        inputLine.remove(inputLine.length() - 1);
+        Serial.print("\b \b");
       }
-    } else if (inputLine.length() < 40) {
-      inputLine += c;
-      Serial.print(c);                               // vis det, der skrives
+    } else if (c >= 32 && c <= 126) {                // kun almindelige tegn, støj ignoreres
+      if (inputLine.length() >= 40) { tooLong = true; continue; }
+      inputLine += (char)c;
+      Serial.print((char)c);                         // vis det, der skrives
     }
   }
 }
@@ -94,6 +121,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   delay(500);
+  // Smid støj fra opstarten væk. Sker før hjælpeteksten vises, så intet skrevet efter den går tabt.
+  while (Serial.available()) Serial.read();
 
   WiFi.mode(WIFI_STA);
   while (!WiFi.STA.started()) delay(10);
