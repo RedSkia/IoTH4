@@ -2,9 +2,12 @@
 // Melder sig til ankrene, modtager RSSI (ESP-NOW), beregner hver enheds position
 // og sender id, tid og koordinat til MQTT med TLS og login.
 // Ankrene melder selv nummer og position, så gatewayen kender dem uden config.
+// Antal ankre og afstand kan ændres i Serial Monitor og gemmes i flash (anchors, spacing, list).
+// Ankre, der ikke er hørt i LOST_ANCHOR_MS, fjernes af sig selv.
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Preferences.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ESP32_NOW.h>
@@ -90,13 +93,40 @@ Tracked* findOrAdd(const uint8_t* id) {
   return t;
 }
 
+// ---------- Opstilling (gemt i flash, ændres i Serial Monitor) ----------
+Preferences layoutStore;
+int         ringSize = DEFAULT_ANCHORS;              // antal ankre i ringen
+float       spacing  = DEFAULT_SPACING_M;            // meter mellem naboer
+
+bool validRingSize(int n) {
+  return n >= MIN_ANCHORS && n <= MAX_ANCHORS && (!ESPNOW_ENCRYPT || n <= MAX_ENCRYPTED_ANCHORS);
+}
+bool validSpacing(float m) { return m >= 0.1f && m <= 100.0f; }   // false for NAN
+
+void loadLayout() {
+  layoutStore.begin("gateway", false);
+  int   n = layoutStore.getInt("anchors", DEFAULT_ANCHORS);
+  float m = layoutStore.getFloat("spacing", DEFAULT_SPACING_M);
+  ringSize = validRingSize(n) ? n : DEFAULT_ANCHORS;
+  spacing  = validSpacing(m)  ? m : DEFAULT_SPACING_M;
+}
+
+void forgetSettings() {
+  Preferences store;
+  store.begin("gateway", false);
+  store.clear();
+  store.end();
+}
+
 // ---------- Ankre, der har meldt sig ----------
 struct Anchor {
-  bool        used;
-  uint8_t     mac[6];
-  uint8_t     id;
-  Point       pos;
-  AnchorPeer* peer;                                  // kun ved kryptering
+  bool          used;
+  uint8_t       mac[6];
+  uint8_t       id;
+  bool          ownPos;                              // true = ankeret har selv fået en position (fx "3 1.5 2")
+  Point         pos;
+  unsigned long lastHeard;                           // sidste besked fra ankeret
+  AnchorPeer*   peer;                                // kun ved kryptering
 };
 
 Anchor anchors[MAX_ANCHORS];
@@ -138,13 +168,14 @@ void registerAnchor(const uint8_t* mac, const AnchorHello& hello) {
     a->used = true;
     memcpy(a->mac, mac, 6);
   }
-  Point pos = isnan(hello.x) ? ringPosition(hello.anchorId, ANCHORS, SPACING_M)   // kun nummer: brug opstillingen
-                            : Point{hello.x, hello.y};                            // egen position
+  bool  ownPos = !isnan(hello.x) && !isnan(hello.y);
+  Point pos    = ownPos ? Point{hello.x, hello.y}                              // egen position
+                        : ringPosition(hello.anchorId, ringSize, spacing);     // kun nummer: brug opstillingen
   bool moved = a->id != hello.anchorId || a->pos.x != pos.x || a->pos.y != pos.y;
-  a->id  = hello.anchorId;
-  a->pos = pos;
-  if (isnan(hello.x) && hello.anchorId > ANCHORS)
-    Serial.printf("Warning: A%d is higher than ANCHORS = %d in config.h\n", hello.anchorId, ANCHORS);
+  a->id        = hello.anchorId;
+  a->ownPos    = ownPos;
+  a->pos       = pos;
+  a->lastHeard = millis();
 
   if (ESPNOW_ENCRYPT && !a->peer) {
     a->peer = new AnchorPeer(mac);
@@ -155,7 +186,30 @@ void registerAnchor(const uint8_t* mac, const AnchorHello& hello) {
     }
   }
 
-  if (isNew || moved) Serial.printf("Anchor A%d at (%.2f, %.2f) %s\n", a->id, a->pos.x, a->pos.y, isNew ? "joined" : "updated");
+  if (isNew || moved) {
+    Serial.printf("Anchor A%d at (%.2f, %.2f) %s\n", a->id, a->pos.x, a->pos.y, isNew ? "joined" : "updated");
+    if (!ownPos && a->id > ringSize)
+      Serial.printf("Warning: A%d is higher than the number of anchors (%d). Type: anchors %d\n",
+                    a->id, ringSize, a->id);
+  }
+}
+
+// Ankre, der ikke er hørt længe (slukket, flyttet, løbet tør for strøm), fjernes
+void dropSilentAnchors() {
+  for (Anchor& a : anchors) {
+    if (a.used && millis() - a.lastHeard > LOST_ANCHOR_MS) {
+      Serial.printf("Anchor A%d left (nothing heard for %lu s)\n", a.id, LOST_ANCHOR_MS / 1000);
+      forgetAnchor(a);
+    }
+  }
+}
+
+// Ny opstilling: regn ringpositionerne ud igen. Ankre med egen position røres ikke.
+void applyLayout() {
+  for (Anchor& a : anchors) {
+    if (!a.used || a.ownPos) continue;
+    a.pos = ringPosition(a.id, ringSize, spacing);
+  }
 }
 
 // ---------- Netværk ----------
@@ -220,6 +274,7 @@ void handle(const Packet& p) {
     if (ESPNOW_ENCRYPT && !p.fromPeer) return;       // kryptering påkrævet: ukrypterede målinger afvises
     Measurement m;
     memcpy(&m, p.data, sizeof(m));
+    if (m.anchorId == anchor->id) anchor->lastHeard = millis();
     handleMeasurement(*anchor, m);
   }
 }
@@ -277,13 +332,75 @@ void printAnchors() {
   Serial.print("Anchors:");
   for (Anchor& a : anchors)
     if (a.used) { Serial.printf(" A%d", a.id); n++; }
-  Serial.printf("  (%d)\n", n);
+  Serial.printf("  (%d of %d)\n", n, ringSize);
   if (n < MIN_ANCHORS) Serial.printf("Need at least %d anchors for a position\n", MIN_ANCHORS);
+}
+
+void printLayout() {
+  Serial.printf("Layout: %d anchors, %.2f m apart (saved on this board)\n", ringSize, spacing);
+}
+
+void printList() {
+  printLayout();
+  for (int id = 1; id <= ringSize; id++) {           // hvor hvert anker skal stå, og om det er med
+    Point p = ringPosition(id, ringSize, spacing);
+    Anchor* found = nullptr;
+    for (Anchor& a : anchors) if (a.used && a.id == id) found = &a;
+    if (!found)            Serial.printf("  A%d  (%.2f, %.2f)  missing\n", id, p.x, p.y);
+    else if (found->ownPos) Serial.printf("  A%d  (%.2f, %.2f)  online, own position\n", id, found->pos.x, found->pos.y);
+    else                   Serial.printf("  A%d  (%.2f, %.2f)  online\n", id, p.x, p.y);
+  }
+  for (Anchor& a : anchors)                          // ankre uden for ringen (højere nummer)
+    if (a.used && a.id > ringSize)
+      Serial.printf("  A%d  (%.2f, %.2f)  online, %s\n", a.id, a.pos.x, a.pos.y,
+                    a.ownPos ? "own position" : "number higher than anchors!");
+}
+
+void printHelp() {
+  Serial.println("Gateway:");
+  Serial.println("  anchors <n>   = number of anchors, e.g. anchors 5");
+  Serial.println("  spacing <m>   = meters between neighbour anchors, e.g. spacing 2.5");
+  Serial.println("  list          = show layout and anchors");
+}
+
+bool command(const char* line) {
+  int   n;
+  float m;
+  if (strcmp(line, "list") == 0) {
+    printList();
+    return true;
+  }
+  if (sscanf(line, "anchors %d", &n) == 1) {
+    if (!validRingSize(n)) {
+      int maxN = ESPNOW_ENCRYPT ? MAX_ENCRYPTED_ANCHORS : MAX_ANCHORS;
+      Serial.printf("Anchors must be %d-%d%s\n", MIN_ANCHORS, maxN,
+                    ESPNOW_ENCRYPT ? " (encryption limit, see ESPNOW_ENCRYPT in config.h)" : "");
+      return true;
+    }
+    ringSize = n;
+    layoutStore.putInt("anchors", n);
+  }
+  else if (sscanf(line, "spacing %f", &m) == 1) {
+    if (!validSpacing(m)) {
+      Serial.println("Spacing must be 0.1-100 m");
+      return true;
+    }
+    spacing = m;
+    layoutStore.putFloat("spacing", m);
+  }
+  else return false;
+
+  applyLayout();
+  Serial.println("Saved.");
+  printList();
+  return true;
 }
 
 // ---------- Program ----------
 void setup() {
   Serial.println("Role: gateway");
+  loadLayout();
+  printLayout();
   group = groupId(MQTT_USER);
   inbox = xQueueCreate(128, sizeof(Packet));          // plads til mange ankre og mobiler på én gang
 
@@ -339,6 +456,7 @@ void loop() {
   static unsigned long lastCompute = 0;
   if (millis() - lastCompute >= WINDOW_MS) {
     lastCompute = millis();
+    dropSilentAnchors();
     computePositions();
   }
 

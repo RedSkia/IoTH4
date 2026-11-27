@@ -1,10 +1,14 @@
 // ===== IndoorPos: samme program på alle boards =====
 // Skriv i Serial Monitor og tryk Enter:
 //   g              → boardet bliver gateway
-//   3              → boardet bliver anker 3 (positionen regnes ud fra ANCHORS og SPACING_M i config.h)
+//   3              → boardet bliver anker 3 (gatewayen regner positionen ud fra opstillingen)
 //   3 1.5 2        → anker 3 i en selvvalgt position (x, y i meter), fx til en skæv opstilling
-//   reset          → glem rollen
-// Valget gemmes i boardets flash, så det kun skal gøres én gang.
+//   reset          → glem rollen og opstillingen
+// Kun på gatewayen:
+//   anchors 5      → antal ankre i ringen
+//   spacing 2.5    → meter mellem to naboankre
+//   list           → vis opstillingen og de ankre, der er med
+// Alt gemmes i boardets flash, så det kun skal gøres én gang.
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -24,7 +28,8 @@ void printHelp() {
   Serial.println("  g             = gateway");
   Serial.println("  <nr>          = anchor, e.g. 3");
   Serial.println("  <nr> <x> <y>  = anchor at your own position, e.g. 3 1.5 2");
-  Serial.println("  reset         = forget role");
+  Serial.println("  reset         = forget role and settings");
+  if (role == ROLE_GATEWAY) gateway::printHelp();
 }
 
 void saveAndRestart(const char* text) {
@@ -42,11 +47,15 @@ void runCommand(String line) {
 
   if (line == "reset") {
     settings.clear();
-    saveAndRestart("Role forgotten");
+    gateway::forgetSettings();
+    saveAndRestart("Role and settings forgotten");
   }
   else if (line == "g" || line == "gateway") {
     settings.putUChar("role", ROLE_GATEWAY);
     saveAndRestart("Saved: gateway");
+  }
+  else if (role == ROLE_GATEWAY && gateway::command(line.c_str())) {
+    // klaret af gatewayen
   }
   else {
     int parsed = sscanf(line.c_str(), "%d %f %f", &id, &x, &y);

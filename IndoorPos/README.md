@@ -35,14 +35,19 @@ Virker med **2 ankre** (position på en linje) og **3 eller flere** (position i 
 
 ## Opsætning
 1. Kopiér `include/secrets_example.h` til `include/secrets.h`, og udfyld den.
-2. Skriv i `include/config.h`, hvor mange ankre I bruger (`ANCHORS`), og hvor mange meter der er mellem dem (`SPACING_M`).
-3. Upload til alle boards (samme program).
-4. Sæt hvert board til computeren, åbn Serial Monitor, skriv, og tryk Enter:
+2. Upload til alle boards (samme program).
+3. Sæt hvert board til computeren, åbn Serial Monitor, skriv, og tryk Enter:
    - `g` på ét board → gateway
    - `1`, `2`, `3` … på de andre → ankrenes numre
+4. Skriv opstillingen i **gatewayens** Serial Monitor (standard er 4 ankre, 2 m):
+   - `anchors 4` → antal ankre
+   - `spacing 2` → meter mellem to naboankre
+   - `list` → vis opstillingen, og hvilke ankre der er med
 5. Stil ankrene op som vist nedenfor, og tænd alle boards. Færdig.
 
-**Sådan stilles ankrene:** altid **med uret** rundt, set oppefra. A1 øverst til venstre, A2 til højre for den, og så videre rundt. `SPACING_M` er afstanden mellem to naboer.
+Alt gemmes i boardets flash, så det kun skal skrives én gang. Ingen ny upload, når opstillingen ændres.
+
+**Sådan stilles ankrene:** altid **med uret** rundt, set oppefra. A1 øverst til venstre, A2 til højre for den, og så videre rundt. `spacing` er afstanden mellem to naboer.
 ```
 2 ankre:  A1 ── A2
 
@@ -53,7 +58,8 @@ Virker med **2 ankre** (position på en linje) og **3 eller flere** (position i 
 - Gatewayen skriver `Anchor A1 at (0.00, 0.00) joined` for hvert anker.
 - Testmobilen skal være forbundet til `IoT_H3/4`.
 - **Skæv opstilling?** Skriv nummer og position selv, fx `3 1.5 2` (x og y i meter).
-- **Skift rolle:** skriv en ny kommando, eller `reset` for at starte forfra.
+- **Anker slukket?** Gatewayen fjerner det efter 30 sekunder (`Anchor A3 left`) og regner videre med resten. Tændes det igen, kommer det selv med.
+- **Skift rolle:** skriv en ny kommando, eller `reset` for at starte forfra (glemmer også opstillingen).
 
 ## Kalibrering
 Afstanden beregnes med `d = 10^((RSSI_AT_1M − RSSI) / (10 · n))`.
@@ -83,8 +89,9 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 | `RSSI_AT_1M` | −45 | Kalibreres |
 | `PATH_LOSS_EXPONENT` | 2.5 | Kalibreres |
 | `RSSI_MIN` | −90 | Svagere pakker ignoreres |
-| `ANCHORS` | 4 | Antal ankre i opstillingen |
-| `SPACING_M` | 2.0 | Meter mellem to naboankre i ringen |
+| `DEFAULT_ANCHORS` | 4 | Antal ankre, indtil der er skrevet `anchors <n>` på gatewayen |
+| `DEFAULT_SPACING_M` | 2.0 | Meter mellem naboankre, indtil der er skrevet `spacing <m>` |
+| `LOST_ANCHOR_MS` | 30000 | Et anker, der ikke er hørt så længe, fjernes |
 | `MIN_ANCHORS` | 2 | Ankre der skal til for en position |
 | `MAX_ANCHORS` | 32 | Ankre gatewayen kan holde styr på |
 | `ESPNOW_ENCRYPT` | true | Krypteret ESP-NOW. Højst 7 ankre (ESP32-grænse, tjekkes ved kompilering). Sæt `false` for flere |
@@ -99,13 +106,14 @@ Topic: `elever/<bruger>/position` på `wilsons.local:8883` (TLS + login).
 | Ingen positioner | Mobilen sender næsten intet, når skærmen er slukket. Hold skærmen tændt og afspil fx en video under test |
 | Anker dobbeltblinker hele tiden | Den hører ikke gatewayen. Tjek at gatewayen kører og har wi-fi, og at `secrets.h` er ens på alle boards (samme `MQTT_USER` og `ESPNOW_PMK`) |
 | `A3 moved to a new board` gentages | To boards har samme nummer. Giv det ene et nyt nummer i Serial Monitor |
-| `Warning: A5 is higher than ANCHORS` | Ankrets nummer er større end `ANCHORS` i config.h. Ret tallet |
+| `Warning: A5 is higher than the number of anchors` | Ankrets nummer er større end antallet. Skriv `anchors 5` på gatewayen |
+| `Anchors must be 2-7` | Grænsen for krypteret ESP-NOW. Sæt `ESPNOW_ENCRYPT = false` for flere ankre |
 | `no room for more encrypted anchors` | For mange krypterede ankre. Sæt `ESPNOW_ENCRYPT = false` |
 | `MQTT error 4/5` | Forkert MQTT-login |
 | Positionen hopper meget | Normalt for RSSI. Kalibrér igen, og hold ankrene i samme højde med fri antenne |
 
 ## Udskiftning og udbygning
-- **Flere ankre:** sæt `ANCHORS` op, upload, og giv det nye anker et nummer.
+- **Flere eller færre ankre:** skriv fx `anchors 5` på gatewayen, og giv det nye anker et nummer. Ingen upload.
 - **Udskift et anker:** giv det nye board samme nummer. Gatewayen glemmer selv det gamle.
 - **Andet signal end wi-fi** (fx BLE): skift kun snifferen i `src/anchor/`. Beskederne og gatewayen er uændrede.
 - **Anden beregning** (fx vægtet centroid eller Kalman-filter): skift `lib/positioning/`. Testene viser, om den stadig virker.

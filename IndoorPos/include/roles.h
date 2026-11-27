@@ -11,6 +11,9 @@ void loop();
 namespace gateway {
 void setup();
 void loop();
+bool command(const char* line);                      // anchors <n>, spacing <m>, list. false = ikke en gateway-kommando
+void printHelp();
+void forgetSettings();                               // slet opstillingen i flash (bruges af reset)
 }
 
 // Læser kommandoer fra Serial Monitor (g, <nummer> <x> <y>, reset). Kaldes ofte af begge roller.
